@@ -15,7 +15,7 @@ A Grok Bot template cannot carry scripts, so they live here and are distributed 
 - `VERSION`: the version. The tag is `v` followed by VERSION (`0.1.0` → `v0.1.0`).
 - `CHANGELOG.md`: changes per version.
 - `MIGRATIONS.md`: manual steps when upgrading. The update skill reads it.
-- `SHA256SUMS`: checksums of `scripts/`. `SHA256SUMS.asc` is its signature.
+- `SHA256SUMS`: checksums of every file the bot receives (scripts, skills, routines, VERSION, CHANGELOG, MIGRATIONS). `SHA256SUMS.asc` is its signature.
 - `keys/release.asc`: the public signing key (fingerprint `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`). The update skill carries the same key.
 - `tools/`, `tests/`: for people changing this repository. They are not installed in the bot.
 
@@ -40,8 +40,8 @@ tar -xzf a.tgz --strip-components=1
 g=$(mktemp -d)
 GNUPGHOME="$g" gpg --batch --quiet --import keys/release.asc
 GNUPGHOME="$g" gpg --batch --with-colons --list-keys | awk -F: '/^fpr/{print $10; exit}'   # stop unless F136EFC61A9D82927C3243EE0FAD42251453DA94
-GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null | grep '^\[GNUPG:\] VALIDSIG F136EFC61A9D82927C3243EE0FAD42251453DA94 '   # stop if nothing is printed
-(cd scripts && sha256sum -c ../SHA256SUMS)   # stop unless every line is OK
+GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null | grep -cE '^\[GNUPG:\] (GOODSIG |VALIDSIG F136EFC61A9D82927C3243EE0FAD42251453DA94 )'   # stop unless it prints 2
+sha256sum -c SHA256SUMS   # stop unless every line is OK
 mkdir -p /workspace/line-inbox/bin
 cp scripts/*.py VERSION SHA256SUMS SHA256SUMS.asc /workspace/line-inbox/bin/
 chmod 700 /workspace/line-inbox/bin/*.py
@@ -51,7 +51,7 @@ rm -rf "$g"
 `/workspace/line-inbox/bin/` is shared by the bots on the same computer. If another version is already there, check before overwriting it. Always run the scripts as `DESK_DB=<this bot's database path> python3 /workspace/line-inbox/bin/<name>`.
 
 ## Checking the version and updating
-- Installed version: `cat /workspace/line-inbox/bin/VERSION`. Unchanged contents: `cd /workspace/line-inbox/bin && sha256sum -c SHA256SUMS`.
+- Installed version: `cat /workspace/line-inbox/bin/VERSION`. Unchanged contents: `cd /workspace/line-inbox/bin && { sed -n 's#  scripts/#  #p' SHA256SUMS; grep '  VERSION$' SHA256SUMS; } | sha256sum -c`.
 - Latest version: the latest [Release](https://github.com/keesmark/grok-bot-line-desk/releases/latest). `VERSION` on main is not used, since it may be bumped before the Release. Ask the bot 「更新はある？」 and the update skill checks.
 - Updates are never installed automatically. The update skill shows what changed and replaces the scripts only when the owner says 「更新」.
 

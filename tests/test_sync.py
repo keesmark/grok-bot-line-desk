@@ -55,7 +55,9 @@ class SyncTest(unittest.TestCase):
         return (self.root / name).read_text(encoding="utf-8")
 
     def expected_sums(self):
-        return "%s  a.py\n%s  b.py\n" % (digest("print('a')\n"), digest("print('b')\n"))
+        names = ["CHANGELOG.md", "MIGRATIONS.md", "VERSION", "routines/line-webhook.md", "scripts/a.py",
+                 "scripts/b.py", "skills/getting-started/SKILL.md", "skills/reply/SKILL.md"]
+        return "".join("%s  %s\n" % (digest(self.text(name)), name) for name in names)
 
     def test_writes_sums_labels_and_tags(self):
         code, out, err = self.run_sync()
@@ -90,6 +92,11 @@ class SyncTest(unittest.TestCase):
         self.assertIn("README.md: out of date", err)
         self.assertFalse((self.root / "SHA256SUMS").exists())
         self.assertEqual(self.text("README.md"), FILES["README.md"])
+
+    def test_sums_cover_rewritten_skills(self):
+        self.run_sync()
+        self.assertIn("%s  skills/reply/SKILL.md\n" % digest("# reply\n\n版：Desk for LINE v0.2.0\n"),
+                      self.text("SHA256SUMS"))
 
     def test_check_detects_changed_script(self):
         self.run_sync()

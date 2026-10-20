@@ -3,15 +3,15 @@
 
 Usage: tools/release.py [--verify]
 
-Without --verify: runs tools/sync.py, signs SHA256SUMS with the release key
-from your own gpg keyring (gpg asks for the passphrase) into SHA256SUMS.asc,
-then runs the same checks as --verify.
+Without --verify: runs tools/sync.py and, unless SHA256SUMS.asc already
+passes the checks below, signs SHA256SUMS with the release key from your own
+gpg keyring (gpg asks for the passphrase) into SHA256SUMS.asc, then checks.
 
 --verify checks that the key block in skills/update/SKILL.md is the same as
-keys/release.asc, that the key's fingerprint is the 「鍵の番号」 in that skill,
-and that SHA256SUMS.asc is a good signature of SHA256SUMS by that key.
-Changes nothing. CI runs it.
-Exit: 0 ok, 1 a check failed, 2 cannot run (gpg missing, file unreadable).
+keys/release.asc, that the key's fingerprint is the 「鍵の番号」 in that skill
+and appears in both READMEs, and that SHA256SUMS.asc is a good signature
+(GOODSIG and VALIDSIG) of SHA256SUMS by that key. Changes nothing. CI runs it.
+Exit: 0 ok, 1 a check failed, 2 cannot run (gpg missing, key or skill unreadable).
 """
 import argparse
 import re
@@ -27,6 +27,7 @@ import sync
 ROOT = sync.ROOT
 SKILL = "skills/update/SKILL.md"
 KEY = "keys/release.asc"
+READMES = ("README.md", "README.en.md")
 KEY_RE = re.compile(r"^-----BEGIN PGP PUBLIC KEY BLOCK-----$.*?^-----END PGP PUBLIC KEY BLOCK-----$",
                     re.M | re.S)
 FPR_RE = re.compile(r"^鍵の番号：([0-9A-F]{40})$", re.M)
@@ -51,6 +52,9 @@ def check(root):
         problems.append("%s: no 「鍵の番号：<40 hex>」 line" % SKILL)
         return problems
     fpr = fpr.group(1)
+    for name in READMES:
+        if fpr not in sync.read(root / name):
+            problems.append("%s: does not mention 鍵の番号 %s" % (name, fpr))
     with tempfile.TemporaryDirectory() as home:
         gpg("--quiet", "--import", str(root / KEY), home=home)
         listed = gpg("--with-colons", "--list-keys", home=home).stdout
@@ -59,7 +63,9 @@ def check(root):
             problems.append("%s: fingerprints %s are not just 鍵の番号 %s" % (KEY, found, fpr))
         status = gpg("--status-fd", "1", "--verify", str(root / "SHA256SUMS.asc"), str(root / "SHA256SUMS"),
                      home=home).stdout
-        if not any(line.startswith("[GNUPG:] VALIDSIG %s " % fpr) for line in status.splitlines()):
+        lines = status.splitlines()
+        if not (any(line.startswith("[GNUPG:] GOODSIG ") for line in lines)
+                and any(line.startswith("[GNUPG:] VALIDSIG %s " % fpr) for line in lines)):
             problems.append("SHA256SUMS.asc: not a good signature of SHA256SUMS by %s" % fpr)
     return problems
 
@@ -67,6 +73,9 @@ def check(root):
 def sign(root):
     if sync.main([], root=root) != 0:
         return False
+    if not check(root):
+        print("SHA256SUMS.asc is already a good signature; not signing again")
+        return True
     fpr = FPR_RE.search(sync.read(root / SKILL))
     if not fpr:
         return False

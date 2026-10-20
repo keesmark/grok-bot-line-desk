@@ -29,13 +29,28 @@ description: 「更新はある？」「新しい版にして」「いまの版�
 7. うまく動かなければ bin.before-v<今の版> を bin に戻して伝える。
 
 ## 署名の確かめ方
-取ってきたもの（または bin）のフォルダで行う。どこかで通らなければ、そこで止めて社長に伝える。
+確かめたいフォルダ（取ってきたものを広げた場所、または bin）に `cd` してから、下を**1つのコマンドとしてそのまま**実行する（分けて実行しない。鍵と鍵の番号はこのスキルのファイルから切り出すので、本文を読んで書き写さない）。
 
-1. `g=$(mktemp -d)`。鍵はこのスキルのファイルから切り出す（本文を読んで書き写さない）：`sed -n '/^-----BEGIN PGP PUBLIC KEY BLOCK-----$/,/^-----END PGP PUBLIC KEY BLOCK-----$/p' /home/box/agent-data/workflows/update/SKILL.md > "$g/key.asc"`。ファイルがない・切り出せないときは止める。
-2. `GNUPGHOME="$g" gpg --batch --quiet --import "$g/key.asc"`。`GNUPGHOME="$g" gpg --batch --with-colons --list-keys | awk -F: '/^fpr/{print $10; exit}'` が下の「鍵の番号」と同じか。
-3. `GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null` の出力に、`[GNUPG:] VALIDSIG <鍵の番号> ` で始まる行があるか（BADSIG・ERRSIG・行がない、はどれも通らない）。
-4. `cd scripts && sha256sum -c ../SHA256SUMS` が全部 OK（bin なら `sha256sum -c SHA256SUMS`）。
-5. `rm -rf "$g"`。
+```sh
+skill=/home/box/agent-data/workflows/update/SKILL.md
+fpr=$(sed -n 's/^鍵の番号：\([0-9A-F]\{40\}\)$/\1/p' "$skill")
+g=$(mktemp -d)
+sed -n '/^-----BEGIN PGP PUBLIC KEY BLOCK-----$/,/^-----END PGP PUBLIC KEY BLOCK-----$/p' "$skill" > "$g/key.asc"
+GNUPGHOME="$g" gpg --batch --quiet --import "$g/key.asc" 2>/dev/null
+got=$(GNUPGHOME="$g" gpg --batch --with-colons --list-keys 2>/dev/null | awk -F: '/^fpr/{print $10}')
+status=$(GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null)
+rm -rf "$g"
+if [ ${#fpr} -eq 40 ] && [ "$got" = "$fpr" ] \
+  && printf '%s\n' "$status" | grep -q '^\[GNUPG:\] GOODSIG ' \
+  && printf '%s\n' "$status" | grep -q "^\[GNUPG:\] VALIDSIG $fpr "; then
+  echo "signature ok"
+else
+  echo "signature NG"
+fi
+```
+
+- `signature ok` が出たら、続けて中身を確かめる。取ってきたフォルダでは `sha256sum -c SHA256SUMS`（全部 OK）。bin では `{ sed -n 's#  scripts/#  #p' SHA256SUMS; grep '  VERSION$' SHA256SUMS; } | sha256sum -c`（全部 OK）。
+- `signature NG`、スキルのファイルがない、中身の照合で OK でない行がある、のどれかなら止めて社長に伝える。
 
 ## 署名の鍵
 update では書き換えない。社長に見せるときは「指紋」と言わず「鍵の番号」と言う。

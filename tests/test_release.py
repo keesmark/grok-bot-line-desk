@@ -57,6 +57,8 @@ class ReleaseTest(unittest.TestCase):
         self.write("skills/update/SKILL.md", skill_text(self.fpr, self.key))
         self.write("keys/release.asc", self.key)
         self.write("SHA256SUMS", "abc  a.py\n")
+        for name in ("README.md", "README.en.md"):
+            self.write(name, "key %s\n" % self.fpr)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -125,6 +127,13 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("are not just 鍵の番号 %s" % self.other_fpr, err)
 
+    def test_verify_requires_fingerprint_in_readmes(self):
+        self.sign_with(self.signer)
+        self.write("README.en.md", "no key\n")
+        code, _, err = self.run_release("--verify")
+        self.assertEqual(code, 1)
+        self.assertIn("README.en.md: does not mention 鍵の番号 %s" % self.fpr, err)
+
     def test_verify_reports_unreadable_key(self):
         (self.root / "keys/release.asc").unlink()
         code, _, err = self.run_release("--verify")
@@ -139,6 +148,17 @@ class ReleaseTest(unittest.TestCase):
         synced.assert_called_once_with([], root=self.root)
         self.assertTrue((self.root / "SHA256SUMS.asc").exists())
         self.assertIn("ok", out)
+
+    def test_sign_skips_when_signature_is_already_good(self):
+        self.sign_with(self.signer)
+        before = (self.root / "SHA256SUMS.asc").read_bytes()
+        with mock.patch.object(release.sync, "main", return_value=0), \
+                mock.patch.object(release.subprocess, "run", wraps=subprocess.run) as ran:
+            code, out, _ = self.run_release()
+        self.assertEqual(code, 0)
+        self.assertIn("not signing again", out)
+        self.assertEqual((self.root / "SHA256SUMS.asc").read_bytes(), before)
+        self.assertFalse(any("--detach-sign" in call.args[0] for call in ran.call_args_list))
 
     def test_sign_stops_when_sync_fails(self):
         with mock.patch.object(release.sync, "main", return_value=1):

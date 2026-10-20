@@ -15,7 +15,7 @@ Grok Bot のテンプレート「Desk for LINE」で使うスクリプト・ス�
 - `VERSION`：版。タグは `v` と VERSION をつなげたものです（`0.1.0` → `v0.1.0`）。
 - `CHANGELOG.md`：版ごとの変更。
 - `MIGRATIONS.md`：版を上げるときに手でやる作業。update スキルが読みます。
-- `SHA256SUMS`：`scripts/` の照合値。`SHA256SUMS.asc` はその署名です。
+- `SHA256SUMS`：ボットに入るファイル（scripts・skills・routines・VERSION・CHANGELOG・MIGRATIONS）の照合値。`SHA256SUMS.asc` はその署名です。
 - `keys/release.asc`：署名の公開鍵（鍵の番号 `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`）。update スキルの中にも同じ鍵があります。
 - `tools/`、`tests/`：このリポジトリを直す人のためのもの。ボットには入れません。
 
@@ -40,8 +40,8 @@ tar -xzf a.tgz --strip-components=1
 g=$(mktemp -d)
 GNUPGHOME="$g" gpg --batch --quiet --import keys/release.asc
 GNUPGHOME="$g" gpg --batch --with-colons --list-keys | awk -F: '/^fpr/{print $10; exit}'   # F136EFC61A9D82927C3243EE0FAD42251453DA94 でなければ止める
-GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null | grep '^\[GNUPG:\] VALIDSIG F136EFC61A9D82927C3243EE0FAD42251453DA94 '   # 出なければ止める
-(cd scripts && sha256sum -c ../SHA256SUMS)   # 全部 OK でなければ止める
+GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null | grep -cE '^\[GNUPG:\] (GOODSIG |VALIDSIG F136EFC61A9D82927C3243EE0FAD42251453DA94 )'   # 2 でなければ止める
+sha256sum -c SHA256SUMS   # 全部 OK でなければ止める
 mkdir -p /workspace/line-inbox/bin
 cp scripts/*.py VERSION SHA256SUMS SHA256SUMS.asc /workspace/line-inbox/bin/
 chmod 700 /workspace/line-inbox/bin/*.py
@@ -51,7 +51,7 @@ rm -rf "$g"
 `/workspace/line-inbox/bin/` は同じコンピューターのボットで共有です。すでに別の版が入っていたら、上書きする前に確かめてください。スクリプトはいつも `DESK_DB=<このボットの保存先> python3 /workspace/line-inbox/bin/<名前>` で動かします。
 
 ## 版の確かめ方と更新
-- 入っている版：`cat /workspace/line-inbox/bin/VERSION`。中身が変わっていないか：`cd /workspace/line-inbox/bin && sha256sum -c SHA256SUMS`。
+- 入っている版：`cat /workspace/line-inbox/bin/VERSION`。中身が変わっていないか：`cd /workspace/line-inbox/bin && { sed -n 's#  scripts/#  #p' SHA256SUMS; grep '  VERSION$' SHA256SUMS; } | sha256sum -c`。
 - 新しい版：最新の [Release](https://github.com/keesmark/grok-bot-line-desk/releases/latest)。main の `VERSION` は Release の前に上がることがあるので見ません。ボットに「更新はある？」と聞くと、update スキルが確かめます。
 - 更新は自動では入りません。update スキルが変更点を見せ、社長が「更新」と言ったときだけ入れ替えます。
 
