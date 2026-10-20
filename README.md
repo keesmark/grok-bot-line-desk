@@ -43,6 +43,7 @@ GNUPGHOME="$g" gpg --batch --with-colons --list-keys | awk -F: '/^fpr/{print $10
 GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null | grep -cE '^\[GNUPG:\] (GOODSIG |VALIDSIG F136EFC61A9D82927C3243EE0FAD42251453DA94 )'   # 2 でなければ止める
 sha256sum -c SHA256SUMS   # 全部 OK でなければ止める
 diff <(find scripts skills routines -type f | LC_ALL=C sort) <(awk '{print $2}' SHA256SUMS | grep -E '^(scripts|skills|routines)/' | LC_ALL=C sort)   # 同じでなければ止める（署名にないファイルが混ざっている）
+find . ! -type f ! -type d   # 何か出たら止める（リンクが混ざっている）
 mkdir -p /workspace/line-inbox/bin
 sed -n 's#^[0-9a-f]\{64\}  scripts/\([a-z_]*\.py\)$#\1#p' SHA256SUMS | while read -r f; do cp "scripts/$f" /workspace/line-inbox/bin/; done
 cp VERSION SHA256SUMS SHA256SUMS.asc /workspace/line-inbox/bin/
