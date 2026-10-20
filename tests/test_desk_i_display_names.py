@@ -26,7 +26,7 @@ MEMBER = "U" + "0" * 28 + "c3d4"
 GROUP = "C" + "0" * 28 + "9f3e"
 NAME = "田中 花子"
 FALLBACK = "名前不明（ID末尾 a1b2）"
-PROFILE_KEYS = {"user_id", "display_name", "profile_at", "stale", "short_id", "label"}
+PROFILE_KEYS = {"user_id", "display_name", "nickname", "profile_at", "stale", "short_id", "label", "name_like_nickname"}
 _mods, _ids = {}, itertools.count(1)
 
 
@@ -397,6 +397,136 @@ class DisplayNameTest(unittest.TestCase):
         self.assertIs(found[USER]["name_stale"], False)
         self.assertEqual(found[OTHER]["label"], "名前不明（ID末尾 e5f6）")
 
+
+    def nick(self, user, *args, stdin=""):
+        return self.pc("nickname", user, *args, stdin=stdin)
+
+    def test_nickname_is_the_label_and_survives_a_name_refresh(self):
+        self.inbound(USER, "予約できますか")
+        self.set_name(USER, NAME)
+        code, out, err = self.nick(USER, "--name", "-", stdin=" 田中さん（美容室）\n")
+        self.assertEqual((code, out.strip()), (0, "saved"), err)
+        p = self.profile(USER)
+        self.assertEqual(p["nickname"], "田中さん（美容室）")
+        self.assertEqual(p["display_name"], NAME)
+        self.assertEqual(p["label"], "田中さん（美容室）")
+        self.assertEqual(self.label(USER), "田中さん（美容室）")
+        self.assertEqual(self.pc("get", USER)[1].strip(), NAME)
+        self.set_name(USER, "はなこ")
+        p = self.profile(USER)
+        self.assertEqual((p["display_name"], p["nickname"]), ("はなこ", "田中さん（美容室）"))
+        c = self.chat()
+        self.assertEqual((c["label"], c["name"], c["nickname"]), ("田中さん（美容室）", "はなこ", "田中さん（美容室）"))
+        self.assertIn('who="田中さん（美容室）"', self.plain())
+
+    def test_nickname_from_file_and_clear(self):
+        path = os.path.join(self.dir, "nick.txt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("田中A")
+        code, out, err = self.nick(USER, "--name-file", path)
+        self.assertEqual((code, out.strip()), (0, "saved"), err)
+        self.assertEqual(self.label(USER), "田中A")
+        self.assertIsNone(self.profile(USER)["display_name"])
+        code, out, err = self.nick(USER, "--clear")
+        self.assertEqual((code, out.strip()), (0, "cleared"), err)
+        self.assertIsNone(self.profile(USER)["nickname"])
+        self.assertEqual(self.label(USER), FALLBACK)
+        code, out, err = self.nick(USER, "--name", "-", stdin=" \n")
+        self.assertEqual(code, 1)
+        self.assertIn("name is empty", err)
+
+    def test_nickname_shown_for_another_person_is_refused(self):
+        self.set_name(USER, NAME)
+        self.set_name(OTHER, "鈴木")
+        code, out, err = self.nick(OTHER, "--name", "-", stdin="田中　花子")
+        self.assertEqual(code, 1)
+        self.assertIn("ID末尾 a1b2", err)
+        self.assertNotIn(USER, err)
+        self.assertIsNone(self.profile(OTHER)["nickname"])
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="TANAKA")[0], 0)
+        code, out, err = self.nick(OTHER, "--name", "-", stdin=NAME)
+        self.assertEqual(code, 1)
+        self.assertIn("already used", err)
+        code, out, err = self.nick(OTHER, "--name", "-", stdin="ｔａｎａｋａ")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.label(OTHER), "鈴木")
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="tanaka")[0], 0)
+        code, out, err = self.nick(MEMBER, "--name", "-", stdin="鈴\u200b木")
+        self.assertEqual(code, 1)
+        code, out, err = self.nick(MEMBER, "--name", "-", stdin="名前不明（ID末尾 a1b2）")
+        self.assertEqual(code, 1)
+        self.assertIn("名前不明", err)
+        self.assertEqual(self.nick(MEMBER, "--name", "-", stdin="鈴木（工務店）")[0], 0)
+
+    def test_display_name_like_a_nickname_gets_the_id_tail(self):
+        self.inbound(USER, "予約できますか")
+        self.inbound(OTHER, "明日の件ですが")
+        self.set_name(USER, NAME)
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="田中（美容室）")[0], 0)
+        self.set_name(OTHER, "田中\u200b（美容室）\u202e")
+        found = {c["user_id"]: c for c in self.chats()}
+        self.assertEqual(found[USER]["label"], "田中（美容室）")
+        self.assertEqual(found[OTHER]["label"], "田中（美容室）（ID末尾 e5f6）")
+        self.assertEqual(self.label(OTHER), "田中（美容室）（ID末尾 e5f6）")
+        self.assertEqual(self.profile(OTHER)["label"], "田中（美容室）（ID末尾 e5f6）")
+        self.assertEqual(self.profile(OTHER)["display_name"], "田中（美容室）")
+        self.assertIn('who="田中（美容室）（ID末尾 e5f6）"', self.plain())
+
+    def test_lookalike_of_an_unlisted_nickname_is_flagged(self):
+        self.set_name(USER, NAME)
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="田中（美容室）")[0], 0)
+        self.inbound(OTHER, "明日の件ですが")
+        for fake in ("田中（美容室）\ufe0f", "田中\u3164（美容室）", "田中（美容室）\u034f", "田中\u2800（美容室）"):
+            self.set_name(OTHER, fake)
+            c = self.chat()
+            self.assertEqual(c["user_id"], OTHER)
+            self.assertIs(c["name_like_nickname"], True, fake)
+            self.assertTrue(c["label"].endswith("（ID末尾 e5f6）"), c["label"])
+            p = self.profile(OTHER)
+            self.assertIs(p["name_like_nickname"], True)
+            self.assertTrue(p["label"].endswith("（ID末尾 e5f6）"), p["label"])
+        self.assertIs(self.profile(USER)["name_like_nickname"], False)
+        self.set_name(OTHER, "鈴木")
+        self.assertIs(self.chat()["name_like_nickname"], False)
+
+    def test_unreplied_name_is_cleaned(self):
+        self.inbound(USER, "こんにちは")
+        self.execute("INSERT INTO customers(user_id, display_name) VALUES(?, ?)", USER, "田中\u202e花子\u200b")
+        c = self.chat()
+        self.assertEqual((c["name"], c["label"]), ("田中花子", "田中花子"))
+        self.assertIn('name="田中花子"', self.plain())
+
+    def test_nickname_may_equal_own_display_name(self):
+        self.set_name(USER, NAME)
+        code, out, err = self.nick(USER, "--name", "-", stdin=NAME)
+        self.assertEqual((code, out.strip()), (0, "saved"), err)
+        self.assertEqual(self.label(USER), NAME)
+
+    def test_group_member_nickname_is_the_label(self):
+        self.inbound(MEMBER, "グループです", source="group")
+        self.set_name(MEMBER, "佐藤")
+        self.assertEqual(self.nick(MEMBER, "--name", "-", stdin="佐藤（経理）")[0], 0)
+        c = self.chat("--include-groups")
+        self.assertEqual((c["source_type"], c["label"], c["name"]), ("group", "佐藤（経理）", "佐藤"))
+
+    def test_nickname_needs_init_db_on_an_old_db(self):
+        self.set_name(USER, NAME)
+        self.execute("ALTER TABLE customers DROP COLUMN nickname")
+        p = self.profile(USER)
+        self.assertIsNone(p["nickname"])
+        self.assertEqual(p["label"], NAME)
+        self.inbound(USER, "こんにちは")
+        self.assertEqual(self.chat()["nickname"], "")
+        code, out, err = self.nick(USER, "--name", "-", stdin="田中A")
+        self.assertEqual(code, 1)
+        self.assertIn("customers.nickname is missing", err)
+        code, out, err = self.run_script("init_db")
+        self.assertEqual(code, 0, err)
+        self.assertIn("table customers: added column nickname", out)
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="田中A")[0], 0)
+        self.assertEqual(self.label(USER), "田中A")
+        self.execute("ALTER TABLE customers DROP COLUMN nickname")
+        self.assertEqual(self.label(USER), NAME)
 
 def main():
     before = real_db_stat()
