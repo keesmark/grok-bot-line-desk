@@ -4,7 +4,7 @@ English | [日本語](README.md)
 
 Scripts, skills and the routine used by the Grok Bot template "Desk for LINE". The bot logs inquiries that reach a LINE Official Account, notifies the owner and drafts replies. Nothing is sent to customers without the owner's OK.
 
-A Grok Bot template cannot carry scripts, so they live here and are distributed by version. The relay that delivers LINE webhooks to the bot is [grok-bot-line-relay](https://github.com/keesmark/grok-bot-line-relay).
+A Grok Bot template cannot carry scripts, so they live here and are distributed by version. The relay that delivers LINE webhooks to the bot is [line-webhook-relay](https://github.com/keesmark/line-webhook-relay).
 
 > This is an unofficial template made by an individual. It is not affiliated with, sponsored by or endorsed by xAI (now SpaceXAI) or LY Corporation. Grok is a trademark of SpaceXAI. LINE is a registered trademark or trademark of LY Corporation.
 

@@ -29,15 +29,15 @@ description: 最初の会話で使います。あいさつと商標の注記を�
      - `mkdir -p /workspace/line-inbox/bin`、bin の `*.py` を消し（上書きを社長が OK したときだけ）、スクリプトは「署名の確かめ方」の最後の行のとおり一覧にあるものだけを写す。VERSION・SHA256SUMS・SHA256SUMS.asc も写し、`chmod 700 /workspace/line-inbox/bin/*.py`。一時フォルダを消す。
    - `DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/init_db.py` を実行し（やり直しても安全。フォルダも作る）、「ok, database ready」を確かめる。
    - 受信のルーティン「LINE受信の記録」（Webhookトリガー）があるか見る。取り込みで作られないことがあるので、なければWebhookトリガーで作り、テンプレートの line-webhook ルーティンのプロンプトを、`<保存先>` をこのボットの保存先に置き換えて使う（log_event.py で記録、save_media.py で保存、keyword_reply.py で照合、知らせる。送るのはキーワード応答の自動送信がオンのときの登録の返事だけ。既読をつけない）。サイドバーのWebhook URLと送信キーは手順5で使う。したことを社長に伝える。
-1. フォーク（中継のしくみを自分のGitHubに写す）：https://github.com/keesmark/grok-bot-line-relay/fork で「Create fork」を押してもらう。公開でよい（秘密の値は入らない）。できたと聞けば完了。
+1. フォーク（中継のしくみを自分のGitHubに写す）：https://github.com/keesmark/line-webhook-relay/fork で「Create fork」を押してもらう。公開でよい（秘密の値は入らない）。できたと聞けば完了。
 2. Cloudflareでデプロイ：「Workers & Pages」→「作成」（https://dash.cloudflare.com/?to=/:account/workers-and-pages/create ）→「リポジトリをインポート」。GitHubをつなぎ、フォークを選ぶ。
    - 一覧に出ない：GitHubでCloudflareのアプリにそのリポジトリへのアクセスを許可してもらう。
-   - 名前は `grok-bot-line-relay` のまま（違うとビルド失敗）。ファイルは編集せずデプロイ。
+   - 名前は `line-webhook-relay` のまま（違うとビルド失敗）。ファイルは編集せずデプロイ。
 3. WorkerのURL（`workers.dev` で終わる。秘密ではない。デプロイ後の画面か「設定」→「ドメインとルート」）を教えてもらう。
    - 「Worker URL」の「プロダクション」はオン（オフだとURLが開かず、検証も届かない）。「プレビュー」はオフでよい。
    - 確かめ：`/` にGETで200と `ok`。返らなければCloudflareのデプロイの画面を見てもらう。
 4. チャネルシークレットは社長がCloudflareで自分で入れる（ボットは値を受け取らない・入れない）。次をそのまま見せる。
-   - 開く画面：https://dash.cloudflare.com/?to=/:account/workers/services/view/:worker/production/settings （アカウントやWorkerを選ぶ画面が出たら、自分のアカウントと `grok-bot-line-relay` を選ぶ）。うまく開かなければ https://dash.cloudflare.com/?to=/:account/workers-and-pages →「grok-bot-line-relay」→「設定」→「変数とシークレット」。
+   - 開く画面：https://dash.cloudflare.com/?to=/:account/workers/services/view/:worker/production/settings （アカウントやWorkerを選ぶ画面が出たら、自分のアカウントと `line-webhook-relay` を選ぶ）。うまく開かなければ https://dash.cloudflare.com/?to=/:account/workers-and-pages →「line-webhook-relay」→「設定」→「変数とシークレット」。
    - 入れ方：「追加」→ 種類は「シークレット」（暗号化される。「テキスト」は選ばない）→ 名前 → 値はLINE Developersでチャネルを開き「チャネル基本設定」のチャネルシークレット（32文字）→「デプロイ」。
    - 入れる名前：1つ目のアカウントは `CHANNEL_SECRET`、2つ目からは `CHANNEL_SECRET_<名前>`（英数字と `_`、アカウントごとに変える。例 `CHANNEL_SECRET_SHOP`）。今ある `CHANNEL_SECRET` は上書きしない（前のアカウントが401になる）。
    - 値はチャットに貼らない。入れるまで何も流れない。入れ終えたか聞き、最後は手順6の「検証」で確かめる。

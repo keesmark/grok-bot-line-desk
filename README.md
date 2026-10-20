@@ -4,7 +4,7 @@
 
 Grok Bot のテンプレート「Desk for LINE」で使うスクリプト・スキル・ルーティンです。LINE公式アカウントに届いた問い合わせを、ボットが記録し、知らせ、返信案を作ります。お客様に送るのは社長のOKのあとだけです。
 
-テンプレートにはスクリプトを入れられないため、ここに置いて版ごとに配ります。LINE の Webhook をボットに届ける中継は [grok-bot-line-relay](https://github.com/keesmark/grok-bot-line-relay) です。
+テンプレートにはスクリプトを入れられないため、ここに置いて版ごとに配ります。LINE の Webhook をボットに届ける中継は [line-webhook-relay](https://github.com/keesmark/line-webhook-relay) です。
 
 > 個人が作った非公式のテンプレートです。xAI（現 SpaceXAI）や LINEヤフー株式会社とは関係がなく、提携や推奨も受けていません。Grok は SpaceXAI の商標です。LINE は LINEヤフー株式会社の登録商標または商標です。
 
