@@ -53,7 +53,7 @@ sent logs the pushed reply through log_event.py (status auto_reply,
 auto_reply_unknown or auto_reply_failed) and records the result (only for an
 auto_pending match); --error TEXT (only with failed / unknown) passes the
 send error on to log_event.py. text writes the stored reply of a message's
-match (for 「送信 N」). pending lists suggestions, and auto-sends that failed
+match (when the user approves a suggested reply). pending lists suggestions, and auto-sends that failed
 (reason auto_failed), whose user has had no reply after the message yet.
 
 This script never sends and never contacts LINE. Customer message text is

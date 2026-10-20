@@ -3,10 +3,10 @@
 
 Usage: tools/sync.py [--check]
 
-Rewrites the 「バージョン：Desk for LINE v…」 line of every skills/*/SKILL.md,
-routines/*.md and template/profile.md, the 「Desk for LINE のバージョン：v…（VERSION
-の値は …」 line of template/memory.md, the release tag in the download URLs of
-README.md, README.en.md and skills/desk-getting-started/SKILL.md, and then
+Rewrites the 「バージョン：Desk for LINE v…」 line (「Desk for LINE のバージョン：v…」
+in the memory) of every skills/*/SKILL.md, routines/*.md and template/*.md, the
+release tag in the download URLs of README.md, README.en.md and
+skills/desk-getting-started/SKILL.md, and then
 SHA256SUMS over every file the bot receives (scripts/*.py, skills/*/SKILL.md,
 routines/*.md, template/*.md, VERSION, CHANGELOG.md, MIGRATIONS.md; paths from
 the repository root).
@@ -24,10 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
-LABEL_RE = re.compile(r"(バージョン：Desk for LINE )v\d+(?:\.\d+)*")
-MEMORY_RE = re.compile(r"(Desk for LINE のバージョン：)v\d+(?:\.\d+)*（VERSION の値は \d+(?:\.\d+)*")
-MEMORY = "template/memory.md"
-PROFILE = "template/profile.md"
+LABEL_RE = re.compile(r"(バージョン：Desk for LINE |Desk for LINE のバージョン：)v\d+(?:\.\d+)*")
 TAG_RE = re.compile(r"(/archive/refs/tags/)v\d+(?:\.\d+)*(?=\.tar\.gz)")
 TAGGED = ("README.md", "README.en.md", "skills/desk-getting-started/SKILL.md")
 SECTIONED = ("CHANGELOG.md", "MIGRATIONS.md")
@@ -63,16 +60,13 @@ def plan(root):
     tag = "v" + version
     wanted = {}
     problems = []
-    labelled = sorted(root.glob("skills/*/SKILL.md")) + sorted(root.glob("routines/*.md")) + [root / PROFILE]
+    labelled = (sorted(root.glob("skills/*/SKILL.md")) + sorted(root.glob("routines/*.md"))
+                + sorted(root.glob("template/*.md")))
     for path in labelled:
         text = read(path)
         if not LABEL_RE.search(text):
             problems.append("%s: no 「バージョン：Desk for LINE v…」 line" % path.relative_to(root))
         wanted[path] = LABEL_RE.sub(r"\g<1>" + tag, text)
-    text = read(root / MEMORY)
-    if not MEMORY_RE.search(text):
-        problems.append("%s: no 「Desk for LINE のバージョン：v…（VERSION の値は …」 line" % MEMORY)
-    wanted[root / MEMORY] = MEMORY_RE.sub(lambda m: "%s%s（VERSION の値は %s" % (m.group(1), tag, version), text)
     for name in TAGGED:
         path = root / name
         text = wanted[path] if path in wanted else read(path)

@@ -27,7 +27,7 @@ FILES = {
     "CHANGELOG.md": "# changes\n\n## v0.2.0（2026-11-01）\n\n## v0.1.0（2026-10-20）\n",
     "MIGRATIONS.md": "# migrations\n\n## v0.2.0\nなし\n",
     "template/profile.md": "# profile\n\nバージョン：Desk for LINE v0.1.0\n",
-    "template/memory.md": "- Desk for LINE のバージョン：v0.1.0（VERSION の値は 0.1.0。取得元）\n",
+    "template/memory.md": "- Desk for LINE のバージョン：v0.1.0（取得元）\n",
 }
 
 
@@ -72,7 +72,7 @@ class SyncTest(unittest.TestCase):
                          "バージョン：Desk for LINE v0.2.0\ncurl https://github.com/x/y/archive/refs/tags/v0.2.0.tar.gz\n")
         self.assertEqual(self.text("template/profile.md"), "# profile\n\nバージョン：Desk for LINE v0.2.0\n")
         self.assertEqual(self.text("template/memory.md"),
-                         "- Desk for LINE のバージョン：v0.2.0（VERSION の値は 0.2.0。取得元）\n")
+                         "- Desk for LINE のバージョン：v0.2.0（取得元）\n")
         self.assertIn("/archive/refs/tags/v0.2.0.tar.gz", self.text("README.md"))
         self.assertIn("/archive/refs/tags/v0.2.0.tar.gz", self.text("README.en.md"))
         self.assertIn("updated SHA256SUMS", out)
@@ -122,7 +122,7 @@ class SyncTest(unittest.TestCase):
         (self.root / "template/memory.md").write_text("- Desk for LINE の版：v0.1.0\n", encoding="utf-8")
         code, _, err = self.run_sync()
         self.assertEqual(code, 1)
-        self.assertIn("template/memory.md: no 「Desk for LINE のバージョン：v…（VERSION の値は …」 line", err)
+        self.assertIn("template/memory.md: no 「バージョン：Desk for LINE v…」 line", err)
 
     def test_reports_profile_without_label(self):
         (self.root / "template/profile.md").write_text("# profile\n", encoding="utf-8")

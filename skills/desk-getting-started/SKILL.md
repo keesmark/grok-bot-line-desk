@@ -21,7 +21,7 @@ description: 最初の会話で使います。あいさつをして、メッセ�
    - 保存先を決める：このボットのプロフィールのフォルダ /home/box/agent-data/agents/<agent id>/ の agent id を使い、`/workspace/line-inbox/<agent id>/messages.db` にする（表示名は変わることがあるので使わない）。agent id が分からなければ、担当者に英数字の短い名前を決めてもらう。決めた値をメモリの「保存先」に書く。ほかのボットの保存先や /workspace/line-inbox/messages.db（以前のバージョンの共有の場所）は使わない。以前のバージョンの記録があっても勝手に移さず、README の移し方を案内する。
    - ここから先のスクリプトは、すべて `DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/<名前>` で実行する（DESK_DB がないと止まる）。
    - スクリプトを導入する（テンプレートには含まれていない。バージョンはメモリの「Desk for LINE のバージョン」。確認方法は desk-update スキルの「署名の確認方法」）。
-     - まず /workspace/line-inbox/bin/ を確認する。`VERSION` がメモリのバージョンと同じで、bin で「署名の確認方法」が通れば導入し直さない。bin は同じコンピューターのボットで共有しているので、別のバージョンが入っている、`VERSION` がないのにスクリプトがある、確認が通らない、のいずれかなら、上書きする前に担当者に確認する。
+     - まず /workspace/line-inbox/bin/ を確認する。`VERSION` がメモリのバージョンと同じ（先頭の v を除いて比べる）で、bin で「署名の確認方法」が通れば導入し直さない。bin は同じコンピューターのボットで共有しているので、別のバージョンが入っている、`VERSION` がないのにスクリプトがある、確認が通らない、のいずれかなら、上書きする前に担当者に確認する。
      - 一時フォルダ（mktemp -d）で `curl -fsSL -o a.tgz https://github.com/keesmark/grok-bot-line-desk/archive/refs/tags/v0.1.1.tar.gz` と `tar -xzf a.tgz --strip-components=1` を実行する。
      - 取得したフォルダで「署名の確認方法」を行い、`VERSION` がメモリのバージョンと同じか確認する。確認が通らない、または取得できないときは、止めて担当者に伝える（自分で書いたり、ほかから取得したりしない）。
      - `mkdir -p /workspace/line-inbox/bin` を実行し、bin の `*.py` を消し（上書きを担当者が了承したときだけ）、スクリプトは「署名の確認方法」の最後の行のとおり、一覧にあるものだけをコピーする。VERSION・SHA256SUMS・SHA256SUMS.asc もコピーし、`chmod 700 /workspace/line-inbox/bin/*.py` を実行する。一時フォルダを消す。

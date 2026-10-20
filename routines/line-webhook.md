@@ -18,7 +18,7 @@
 4. 新しい画像・動画・音声・ファイルは、早めに py save_media.py <messages の id> --json で保存する（失敗してもやり直さない）。
 5. 新しい1対1のテキストは py keyword_reply.py match <id> --json で照合する。
   - need_quota（担当者が残り通数で止める設定にしたときだけ）：py quota_check.py --peek --json の remaining を --remaining に付けて再実行する（remaining が null＝上限なしなら --remaining unlimited、読めなければ --remaining unknown）。
-  - suggest：通知に「キーワード『<keyword>』の登録済みの返事があります（送るなら『〇〇さんに送って』と言ってください）」と添える。none・already：何もしない。
+  - suggest：通知に「キーワード『<keyword>』の登録済みの返事があります」と書き、JSON の reply_text を全文そのまま「」で引用し、「この返事を送るなら『〇〇さんに登録の返事を送って』と言ってください」と添える。none・already：何もしない。
   - auto_send：JSON の user_id に送り、py keyword_reply.py sent <id> --result sent|unknown|failed [--line-message-id …] で記録する（結果不明は unknown、エラーは failed --error="<要旨>"。送り直さない）。続けて py quota_check.py --json を実行する。誰に（7と同じ名前）・全文・結果を通知する（不在モード中でも通知する。notice_due なら残り通数も。エラーなら「送れませんでした」と理由と文面の冒頭）。
 6. 不在モード中（DB と同じフォルダの away.json で away が true）は1件ずつ通知しない。last_bundle_at から interval_minutes が過ぎていたら、py list_unreplied.py --include-groups --json で last_bundle_at 以降の分をまとめて通知し（形式は7と同じ）、last_bundle_at を現在時刻にする。まだ過ぎていない、または null なら通知しない（一覧は、担当者が戻ったときか「未返信は？」と聞かれたときに出す）。
 7. 通常は1件ごとに短く通知する。
