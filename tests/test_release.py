@@ -143,7 +143,7 @@ class ReleaseTest(unittest.TestCase):
     def test_sign_writes_good_signature(self):
         with mock.patch.object(release.sync, "main", return_value=0) as synced, \
                 mock.patch.dict(os.environ, {"GNUPGHOME": str(self.signer)}):
-            code, out, err = self.run_release()
+            code, out, err = self.run_release("--no-push")
         self.assertEqual(code, 0, err)
         synced.assert_called_once_with([], root=self.root)
         self.assertTrue((self.root / "SHA256SUMS.asc").exists())
@@ -154,7 +154,7 @@ class ReleaseTest(unittest.TestCase):
         before = (self.root / "SHA256SUMS.asc").read_bytes()
         with mock.patch.object(release.sync, "main", return_value=0), \
                 mock.patch.object(release.subprocess, "run", wraps=subprocess.run) as ran:
-            code, out, _ = self.run_release()
+            code, out, _ = self.run_release("--no-push")
         self.assertEqual(code, 0)
         self.assertIn("not signing again", out)
         self.assertEqual((self.root / "SHA256SUMS.asc").read_bytes(), before)
@@ -181,6 +181,88 @@ class ReleaseTest(unittest.TestCase):
             code, _, err = self.run_release()
         self.assertEqual(code, 1)
         self.assertIn("signing failed", err)
+
+    def git(self, *args, cwd=None):
+        return subprocess.run(["git", "-C", str(cwd or self.root)] + list(args),
+                              capture_output=True, text=True, check=True).stdout
+
+    def make_repo(self):
+        env = mock.patch.dict(os.environ, {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+                                           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com",
+                                           "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"})
+        env.start()
+        self.addCleanup(env.stop)
+        self.write("VERSION", "0.1.1\n")
+        self.remote = Path(self.tmp.name + "-remote.git")
+        self.addCleanup(subprocess.run, ["rm", "-rf", str(self.remote)])
+        subprocess.run(["git", "init", "--quiet", "--bare", str(self.remote)], check=True)
+        self.git("init", "--quiet", "-b", "work")
+        self.git("add", "-A")
+        self.git("commit", "--quiet", "-m", "start")
+        self.git("remote", "add", "origin", str(self.remote))
+        self.git("push", "--quiet", "-u", "origin", "work")
+
+    def release_signed(self):
+        with mock.patch.object(release.sync, "main", return_value=0), \
+                mock.patch.dict(os.environ, {"GNUPGHOME": str(self.signer)}):
+            return self.run_release()
+
+    def test_sign_commits_and_pushes_signature(self):
+        self.make_repo()
+        code, out, err = self.release_signed()
+        self.assertEqual(code, 0, err)
+        self.assertIn("committed SHA256SUMS.asc", out)
+        self.assertIn("pushed", out)
+        self.assertEqual(self.git("log", "-1", "--format=%s", "work", cwd=self.remote).strip(),
+                         "Sign SHA256SUMS for v0.1.1")
+        self.assertEqual(self.git("show", "--name-only", "--format=", "work", cwd=self.remote).split(),
+                         ["SHA256SUMS.asc"])
+        self.assertEqual(self.git("status", "--porcelain"), "")
+        code, out, err = self.release_signed()
+        self.assertEqual(code, 0, err)
+        self.assertIn("not signing again", out)
+        self.assertNotIn("committed", out)
+
+    def test_publish_stops_when_other_files_changed(self):
+        self.make_repo()
+        self.write("README.md", "key %s\nmore\n" % self.fpr)
+        self.write("new.txt", "x\n")
+        code, out, err = self.release_signed()
+        self.assertEqual(code, 1)
+        self.assertIn("other files have uncommitted changes (README.md, new.txt)", err)
+        self.assertEqual(self.git("log", "-1", "--format=%s", "work", cwd=self.remote).strip(), "start")
+        self.assertTrue((self.root / "SHA256SUMS.asc").exists())
+
+    def test_publish_reports_commit_and_push_failures(self):
+        self.make_repo()
+        hook = self.root / ".git/hooks/pre-commit"
+        hook.write_text("#!/bin/sh\necho no commits >&2\nexit 1\n")
+        hook.chmod(0o755)
+        code, _, err = self.release_signed()
+        self.assertEqual(code, 1)
+        self.assertIn("git commit failed: no commits", err)
+        hook.unlink()
+        subprocess.run(["rm", "-rf", str(self.remote)], check=True)
+        code, out, err = self.release_signed()
+        self.assertEqual(code, 1)
+        self.assertIn("committed SHA256SUMS.asc", out)
+        self.assertIn("git push failed", err)
+
+    def test_publish_needs_a_git_checkout_and_version(self):
+        code, _, err = self.release_signed()
+        self.assertEqual(code, 1)
+        self.assertIn("not a git checkout", err)
+        self.make_repo()
+        self.git("rm", "--quiet", "VERSION")
+        self.git("commit", "--quiet", "-m", "drop version")
+        self.write("SHA256SUMS", "def  b.py\n")
+        code, _, err = self.release_signed()
+        self.assertEqual(code, 2)
+        self.assertIn("VERSION", err)
+
+    def test_verify_and_no_push_cannot_be_combined(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            release.main(["--verify", "--no-push"], root=self.root)
 
     def test_runs_as_script(self):
         with mock.patch.object(sys, "argv", [str(TOOL), "--verify"]), \

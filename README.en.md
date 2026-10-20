@@ -75,7 +75,7 @@ After changing scripts or skills, run `python3 tools/sync.py`. It brings `SHA256
 Releasing:
 
 1. Bump `VERSION` and add a `## v<version>` section to `CHANGELOG.md` and `MIGRATIONS.md` (write 「なし」 when there is nothing to do by hand).
-2. On the author's computer, run `python3 tools/release.py` (it syncs and signs in one go; gpg asks for the passphrase). Open a PR and merge it.
+2. On the author's computer, pull the branch and run `python3 tools/release.py`. It syncs, signs, and commits and pushes `SHA256SUMS` and `SHA256SUMS.asc` in one go (gpg asks for the passphrase; it stops when other files have uncommitted changes; add `--no-push` to skip the commit and push). Open a PR and merge it.
 3. Tag the merged commit `v<version>` and create a Release.
 4. Bring the template's memory and profile in line with `template/` and publish the template again (existing users update through the desk-update skill, so this is not required for them).
 

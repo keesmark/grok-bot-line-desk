@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Sign SHA256SUMS for a release, or check the signature.
 
-Usage: tools/release.py [--verify]
+Usage: tools/release.py [--verify | --no-push]
 
 Without --verify: runs tools/sync.py and, unless SHA256SUMS.asc already
 passes the checks below, signs SHA256SUMS with the release key from your own
 gpg keyring (gpg asks for the passphrase) into SHA256SUMS.asc, then checks.
+When the checks pass it commits SHA256SUMS and SHA256SUMS.asc ("Sign SHA256SUMS
+for v<VERSION>") and runs git push, unless --no-push. It stops without
+committing when any other file has uncommitted changes.
 
 --verify checks that the key block in skills/desk-update/SKILL.md is the same as
 keys/release.asc, that the key's fingerprint is the 「鍵の番号」 in that skill
@@ -28,6 +31,7 @@ ROOT = sync.ROOT
 SKILL = "skills/desk-update/SKILL.md"
 KEY = "keys/release.asc"
 READMES = ("README.md", "README.en.md")
+SIGNED = ("SHA256SUMS", "SHA256SUMS.asc")
 KEY_RE = re.compile(r"^-----BEGIN PGP PUBLIC KEY BLOCK-----$.*?^-----END PGP PUBLIC KEY BLOCK-----$",
                     re.M | re.S)
 FPR_RE = re.compile(r"^鍵の番号：([0-9A-F]{40})$", re.M)
@@ -84,9 +88,42 @@ def sign(root):
     return signed.returncode == 0
 
 
+def git(root, *args):
+    return subprocess.run(["git", "-C", str(root)] + list(args), capture_output=True, text=True)
+
+
+def publish(root):
+    status = git(root, "status", "--porcelain", "--untracked-files=all")
+    if status.returncode != 0:
+        print("error: not a git checkout; commit and push SHA256SUMS.asc yourself", file=sys.stderr)
+        return False
+    changed = sorted({line[3:] for line in status.stdout.splitlines()})
+    others = [path for path in changed if path not in SIGNED]
+    if others:
+        print("error: other files have uncommitted changes (%s); commit them first, then run again"
+              % ", ".join(others), file=sys.stderr)
+        return False
+    if changed:
+        version = sync.read(root / "VERSION").strip()
+        for step in (["add"], ["commit", "--quiet", "-m", "Sign SHA256SUMS for v%s" % version]):
+            done = git(root, *step, "--", *changed)
+            if done.returncode != 0:
+                print("error: git %s failed: %s" % (step[0], done.stderr.strip()), file=sys.stderr)
+                return False
+        print("committed %s" % ", ".join(changed))
+    pushed = git(root, "push")
+    if pushed.returncode != 0:
+        print("error: git push failed: %s" % pushed.stderr.strip(), file=sys.stderr)
+        return False
+    print("pushed")
+    return True
+
+
 def main(argv=None, root=ROOT):
     ap = argparse.ArgumentParser(description="Sign SHA256SUMS for a release, or check the signature.")
-    ap.add_argument("--verify", action="store_true", help="change nothing; only check the signature")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--verify", action="store_true", help="change nothing; only check the signature")
+    mode.add_argument("--no-push", action="store_true", help="sign only; do not commit or push")
     args = ap.parse_args(argv)
     try:
         if not args.verify and not sign(root):
@@ -101,7 +138,13 @@ def main(argv=None, root=ROOT):
     if problems:
         return 1
     print("ok, SHA256SUMS.asc is signed by the release key")
-    return 0
+    if args.verify or args.no_push:
+        return 0
+    try:
+        return 0 if publish(root) else 1
+    except (OSError, UnicodeDecodeError) as e:
+        print("error: %s" % e, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
