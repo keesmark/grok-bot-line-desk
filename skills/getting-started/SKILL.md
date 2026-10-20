@@ -32,7 +32,7 @@ description: 最初の会話で使います。あいさつと商標の注記を�
 1. フォーク（中継のしくみを自分のGitHubに写す）：https://github.com/keesmark/line-webhook-relay/fork で「Create fork」を押してもらう。公開でよい（秘密の値は入らない）。できたと聞けば完了。
 2. Cloudflareでデプロイ：「Workers & Pages」→「作成」（https://dash.cloudflare.com/?to=/:account/workers-and-pages/create ）→「リポジトリをインポート」。GitHubをつなぎ、フォークを選ぶ。
    - 一覧に出ない：GitHubでCloudflareのアプリにそのリポジトリへのアクセスを許可してもらう。
-   - 名前は `line-webhook-relay` のまま（違うとビルド失敗）。ファイルは編集せずデプロイ。
+   - 名前は `line-webhook-relay` のまま（ほかの名前だとビルド失敗）。ファイルは編集せずデプロイ。
 3. WorkerのURL（`workers.dev` で終わる。秘密ではない。デプロイ後の画面か「設定」→「ドメインとルート」）を教えてもらう。
    - 「Worker URL」の「プロダクション」はオン（オフだとURLが開かず、検証も届かない）。「プレビュー」はオフでよい。
    - 確かめ：`/` にGETで200と `ok`。返らなければCloudflareのデプロイの画面を見てもらう。
@@ -43,7 +43,7 @@ description: 最初の会話で使います。あいさつと商標の注記を�
    - 値はチャットに貼らない。入れるまで何も流れない。入れ終えたか聞き、最後は手順6の「検証」で確かめる。
    - 別のアカウントのために中継をもう作ってある人は、手順1〜3を飛ばしてここだけ。
 5. Webhook URLを3のURLで組んで見せる：`https://<WorkerのURL>/webhook?url=〇〇&token=△△`
-   - 〇〇：「LINE受信の記録」のサイドバー「Webhook URL」をURLエンコード（URL用に変換）したもの。秘密ではないので、貼ってもらえば変換して返す。
+   - 〇〇：「LINE受信の記録」のサイドバー「Webhook URL」をURLエンコード（URL用に変換）したもの。秘密ではないので、貼ってもらえば変換して返す。サイドバーからそのままコピーしてもらい、`https://api2.cursor.sh` で始まるか確かめる（打ち間違えると、お客様のメッセージと送信キーが別の先へ渡る）。
    - △△：サイドバー「Webhook key」の送信キー。秘密なので社長がLINE Developersの欄で直接つなげる。できたURLはチャットに貼らないよう伝える。
    - URLの形は複数アカウントでも同じ。2つ目のアカウントも同じWorkerのURLで、`url=`・`token=` はそのアカウント用のボットの「LINE受信の記録」のもの。
 6. LINE Developersで、そのアカウントのチャネルの「Messaging API設定」を開き（別のチャネルに貼ると401）、Webhook URLに5のURLを貼り、「Webhookの利用」をONにして「検証」。成功か聞き、失敗なら「つまずいたとき」へ。
@@ -51,9 +51,9 @@ description: 最初の会話で使います。あいさつと商標の注記を�
 8. 送信の接続（line-oa MCP）は、想像で話さず公式ページを示す。
    - https://developers.line.biz/ja/docs/messaging-api/getting-started/
    - https://developers.line.biz/ja/docs/basics/channel-access-token/
-   - 値は `CHANNEL_ACCESS_TOKEN`（社長が秘密の入力欄に入れる）と `NPM_CONFIG_IGNORE_SCRIPTS=true`。
+   - 値は `CHANNEL_ACCESS_TOKEN`（line-oa が読む名前。社長が秘密の入力欄に入れる）と `NPM_CONFIG_IGNORE_SCRIPTS=true`。
    - line-oa は1つのつなぎ先で1アカウント。このボットも1アカウント用で、2つ目のアカウントにはボットをもう1体作る。
-   - `mark_read.py`・`save_media.py` が `LINE_CHANNEL_ACCESS_TOKEN` を読めなければ、秘密の入力欄で一度だけ入れてもらう。
+   - スクリプト（`mark_read.py`・`quota_check.py`・`save_media.py`）は同じチャネルアクセストークンを `LINE_CHANNEL_ACCESS_TOKEN` という名前で読む。読めなければ、秘密の入力欄で一度だけ入れてもらう。
 
 ## つまずいたとき
 - 401：シークレットが違う（チャネルアクセストークンや別のチャネル〈LINEログインなど〉の値、コピーの欠け〈チャネルシークレットは32文字〉、発行し直し）。Webhookのチャネルの「チャネル基本設定」からコピーし直し、Cloudflareで入れ替えてもらう（手順4の画面）。
@@ -61,9 +61,11 @@ description: 最初の会話で使います。あいさつと商標の注記を�
   - `CHANNEL_SECRET_<名前>` の綴りが違う（`CHANNEL_SECRET-SHOP`、`CHANNEL_SECRETSHOP` などは読まれない）。
   - 中継が古い版で、2つ目からのシークレットを読まない。GitHubのフォークで「Sync fork」をして、Cloudflareのデプロイが終わるのを待つ（設定は変えなくてよい）。
 - 500：`CHANNEL_SECRET` も `CHANNEL_SECRET_<名前>` も1つも入っていない。
-- 403：`url=` がGrok BotのWebhook URLでない。サイドバーからコピーし直す。
+- 400：URLに `token=` がない。手順5のURLを組み直す。
+- 403：`url=` が https でない、ポート番号やユーザー名が入っている。サイドバーのWebhook URLをそのままコピーし直す。
 - 別のアカウントのメッセージが届く（「別のアカウント宛てが届きました」と出る）：そのチャネルのWebhook URLの `url=`・`token=` が、別のボットのもの。そのアカウント用のボットのサイドバーから組み直す。覚えたアカウントのほうが違っていたら、社長に確かめてから `account.py set --from-message <id> --relabel`（やり直すなら `account.py forget --yes`）。
-- 何も届かない：URLに `token=` がない、または「Webhookの利用」がOFF。ビルド失敗・URLが開かないときは手順2・3を見直す。
+- 何も届かない：「Webhookの利用」がOFF。ビルド失敗・URLが開かないときは手順2・3を見直す。
+- 前の名前（`grok-bot-line-relay` など）で中継を作っていて、「Sync fork」のあとビルドが失敗する：前の版は動き続けるので慌てなくてよい。新しい名前 `line-webhook-relay` でWorkerを作り（手順2）、シークレットを同じ名前・値で入れ（手順4）、LINEのWebhook URLを新しいWorkerのURLに差し替えて「検証」し（手順5・6）、1通届くのを確かめてから古いWorkerを消す。
 - 直したあとLINE Platformが前のメッセージを送り直すことがあるが、記録は二重にならない。
 - 既読がつかない：故障ではない。応答設定の「チャット」がオンだと、届いただけでは既読にならない。
 

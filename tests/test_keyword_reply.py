@@ -1,6 +1,9 @@
 import importlib.util
+import sys
 import unittest
 from pathlib import Path
+
+sys.dont_write_bytecode = True
 
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 spec = importlib.util.spec_from_file_location("keyword_reply", SCRIPTS / "keyword_reply.py")

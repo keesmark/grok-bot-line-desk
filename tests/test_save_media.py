@@ -11,6 +11,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+sys.dont_write_bytecode = True
+
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 spec = importlib.util.spec_from_file_location("save_media", SCRIPTS / "save_media.py")
 save_media = importlib.util.module_from_spec(spec)
