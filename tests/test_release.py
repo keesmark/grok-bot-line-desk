@@ -52,9 +52,9 @@ class ReleaseTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        (self.root / "skills/update").mkdir(parents=True)
+        (self.root / "skills/desk-update").mkdir(parents=True)
         (self.root / "keys").mkdir()
-        self.write("skills/update/SKILL.md", skill_text(self.fpr, self.key))
+        self.write("skills/desk-update/SKILL.md", skill_text(self.fpr, self.key))
         self.write("keys/release.asc", self.key)
         self.write("SHA256SUMS", "abc  a.py\n")
         for name in ("README.md", "README.en.md"):
@@ -102,27 +102,27 @@ class ReleaseTest(unittest.TestCase):
 
     def test_verify_rejects_skill_key_that_differs(self):
         self.sign_with(self.signer)
-        self.write("skills/update/SKILL.md", skill_text(self.fpr, self.other_key))
+        self.write("skills/desk-update/SKILL.md", skill_text(self.fpr, self.other_key))
         code, _, err = self.run_release("--verify")
         self.assertEqual(code, 1)
         self.assertIn("key block differs from keys/release.asc", err)
 
     def test_verify_rejects_skill_without_key_block(self):
         self.sign_with(self.signer)
-        self.write("skills/update/SKILL.md", "鍵の番号：%s\n" % self.fpr)
+        self.write("skills/desk-update/SKILL.md", "鍵の番号：%s\n" % self.fpr)
         code, _, err = self.run_release("--verify")
         self.assertEqual(code, 1)
         self.assertIn("no public key block", err)
 
     def test_verify_rejects_skill_without_fingerprint(self):
-        self.write("skills/update/SKILL.md", "```text\n%s```\n" % self.key)
+        self.write("skills/desk-update/SKILL.md", "```text\n%s```\n" % self.key)
         code, _, err = self.run_release("--verify")
         self.assertEqual(code, 1)
         self.assertIn("no 「鍵の番号：<40 hex>」 line", err)
 
     def test_verify_rejects_fingerprint_of_another_key(self):
         self.sign_with(self.signer)
-        self.write("skills/update/SKILL.md", skill_text(self.other_fpr, self.key))
+        self.write("skills/desk-update/SKILL.md", skill_text(self.other_fpr, self.key))
         code, _, err = self.run_release("--verify")
         self.assertEqual(code, 1)
         self.assertIn("are not just 鍵の番号 %s" % self.other_fpr, err)
@@ -168,7 +168,7 @@ class ReleaseTest(unittest.TestCase):
         self.assertFalse((self.root / "SHA256SUMS.asc").exists())
 
     def test_sign_stops_without_fingerprint(self):
-        self.write("skills/update/SKILL.md", "no key here\n")
+        self.write("skills/desk-update/SKILL.md", "no key here\n")
         with mock.patch.object(release.sync, "main", return_value=0):
             code, _, err = self.run_release()
         self.assertEqual(code, 1)

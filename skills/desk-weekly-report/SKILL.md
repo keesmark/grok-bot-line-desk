@@ -1,5 +1,5 @@
 ---
-name: weekly-report
+name: desk-weekly-report
 description: 「週報を見せて」「今週どうだった？」と言われたときに使います。スクリプトで数えた数字を、決まった形の文章にします。
 ---
 

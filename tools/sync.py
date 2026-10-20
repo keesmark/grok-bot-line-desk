@@ -5,7 +5,7 @@ Usage: tools/sync.py [--check]
 
 Rewrites the 「版：Desk for LINE v…」 line of every skills/*/SKILL.md and
 routines/*.md, the release tag in the download URLs of README.md,
-README.en.md and skills/getting-started/SKILL.md, and then SHA256SUMS over
+README.en.md and skills/desk-getting-started/SKILL.md, and then SHA256SUMS over
 every file the bot receives (scripts/*.py, skills/*/SKILL.md, routines/*.md,
 VERSION, CHANGELOG.md, MIGRATIONS.md; paths from the repository root).
 CHANGELOG.md and MIGRATIONS.md must already have a "## v<VERSION>" section.
@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 LABEL_RE = re.compile(r"(版：Desk for LINE )v\d+(?:\.\d+)*")
 TAG_RE = re.compile(r"(/archive/refs/tags/)v\d+(?:\.\d+)*(?=\.tar\.gz)")
-TAGGED = ("README.md", "README.en.md", "skills/getting-started/SKILL.md")
+TAGGED = ("README.md", "README.en.md", "skills/desk-getting-started/SKILL.md")
 SECTIONED = ("CHANGELOG.md", "MIGRATIONS.md")
 SHIPPED = ("VERSION",) + SECTIONED
 

@@ -1,5 +1,5 @@
 ---
-name: update
+name: desk-update
 description: 「更新はある？」「新しい版にして」「いまの版は？」と言われたときに使います。公開リポジトリの新しい版と変わったところを見せ、社長のOKのあとでスクリプトを入れ替えます。
 ---
 
@@ -32,7 +32,7 @@ description: 「更新はある？」「新しい版にして」「いまの版�
 確かめたいフォルダ（取ってきたものを広げた場所、または bin）に `cd` してから、下を**1つのコマンドとしてそのまま**実行する（分けて実行しない。鍵と鍵の番号はこのスキルのファイルから切り出すので、本文を読んで書き写さない）。署名に加えて、ファイルの中身と、署名にないファイルやリンク（symlink）が混ざっていないかも確かめる。
 
 ```sh
-skill=/home/box/agent-data/workflows/update/SKILL.md
+skill=/home/box/agent-data/workflows/desk-update/SKILL.md
 fpr=$(sed -n 's/^鍵の番号：\([0-9A-F]\{40\}\)$/\1/p' "$skill")
 g=$(mktemp -d)
 sed -n '/^-----BEGIN PGP PUBLIC KEY BLOCK-----$/,/^-----END PGP PUBLIC KEY BLOCK-----$/p' "$skill" > "$g/key.asc"

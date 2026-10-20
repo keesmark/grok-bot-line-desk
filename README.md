@@ -14,24 +14,24 @@ Grok Bot のテンプレート「Desk for LINE」で使うスクリプト・ス�
 - `routines/line-webhook.md`：受信のルーティン「LINE受信の記録」のプロンプト。
 - `VERSION`：版。タグは `v` と VERSION をつなげたものです（`0.1.0` → `v0.1.0`）。
 - `CHANGELOG.md`：版ごとの変更。
-- `MIGRATIONS.md`：版を上げるときに手でやる作業。update スキルが読みます。
+- `MIGRATIONS.md`：版を上げるときに手でやる作業。desk-update スキルが読みます。
 - `SHA256SUMS`：ボットに入るファイル（scripts・skills・routines・VERSION・CHANGELOG・MIGRATIONS）の照合値。`SHA256SUMS.asc` はその署名です。
-- `keys/release.asc`：署名の公開鍵（鍵の番号 `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`）。update スキルの中にも同じ鍵があります。
+- `keys/release.asc`：署名の公開鍵（鍵の番号 `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`）。desk-update スキルの中にも同じ鍵があります。
 - `tools/`、`tests/`：このリポジトリを直す人のためのもの。ボットには入れません。
 
 ## 入れ方と確かめ方
 
-`SHA256SUMS` は作者（keesmark）の GPG の鍵で署名してあり、ボットは署名を確かめてから入れます。確かめに使う公開鍵と鍵の番号は、テンプレートの update スキルの中にあります。このリポジトリが乗っ取られても、作者の秘密鍵がなければ署名は作れないので、偽の版は入りません。
+`SHA256SUMS` は作者（keesmark）の GPG の鍵で署名してあり、ボットは署名を確かめてから入れます。確かめに使う公開鍵と鍵の番号は、テンプレートの desk-update スキルの中にあります。このリポジトリが乗っ取られても、作者の秘密鍵がなければ署名は作れないので、偽の版は入りません。
 
 ```mermaid
 flowchart LR
-  K[テンプレートの update スキル<br>公開鍵と鍵の番号] --> B[ボット]
+  K[テンプレートの desk-update スキル<br>公開鍵と鍵の番号] --> B[ボット]
   R[GitHub のタグ<br>v + VERSION] -->|tar.gz| B
   B -->|鍵の番号が同じ・署名が正しい<br>scripts が SHA256SUMS と同じ| W["/workspace/line-inbox/bin/"]
   B -.->|どれかが違う| S[止めて社長に伝える]
 ```
 
-ふつうはテンプレートの getting-started スキルが、ボットに次のことをさせます。手で入れるときは、公開鍵をこのリポジトリではなくテンプレートの update スキルから取るか、鍵の番号が `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94` であることを確かめてください。
+ふつうはテンプレートの desk-getting-started スキルが、ボットに次のことをさせます。手で入れるときは、公開鍵をこのリポジトリではなくテンプレートの desk-update スキルから取るか、鍵の番号が `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94` であることを確かめてください。
 
 ```sh
 tmp=$(mktemp -d) && cd "$tmp"
@@ -55,8 +55,8 @@ rm -rf "$g"
 
 ## 版の確かめ方と更新
 - 入っている版：`cat /workspace/line-inbox/bin/VERSION`。中身が変わっていないか：`cd /workspace/line-inbox/bin && { sed -n 's#  scripts/#  #p' SHA256SUMS; grep '  VERSION$' SHA256SUMS; } | sha256sum -c`。
-- 新しい版：最新の [Release](https://github.com/keesmark/grok-bot-line-desk/releases/latest)。main の `VERSION` は Release の前に上がることがあるので見ません。ボットに「更新はある？」と聞くと、update スキルが確かめます。
-- 更新は自動では入りません。update スキルが変更点を見せ、社長が「更新」と言ったときだけ入れ替えます。
+- 新しい版：最新の [Release](https://github.com/keesmark/grok-bot-line-desk/releases/latest)。main の `VERSION` は Release の前に上がることがあるので見ません。ボットに「更新はある？」と聞くと、desk-update スキルが確かめます。
+- 更新は自動では入りません。desk-update スキルが変更点を見せ、社長が「更新」と言ったときだけ入れ替えます。
 
 ## 直すとき（このリポジトリを直す人へ）
 
@@ -76,7 +76,7 @@ python3 -m venv .venv
 1. `VERSION` を上げ、`CHANGELOG.md` と `MIGRATIONS.md` に `## v<版>` の節を足す（手作業がなければ「なし」）。
 2. 作者の PC で `python3 tools/release.py` を実行する（そろえ直しと署名をまとめて行い、gpg がパスフレーズを聞きます）。PR にしてマージする。
 3. マージしたコミットにタグ `v<版>` を付け、Release を作る。
-4. テンプレートのメモリの「Desk for LINE の版」を新しい版にし、テンプレートを出し直す（すでに使っている人は update スキルで更新するので、出し直さなくても動きます）。
+4. テンプレートのメモリの「Desk for LINE の版」を新しい版にし、テンプレートを出し直す（すでに使っている人は desk-update スキルで更新するので、出し直さなくても動きます）。
 
 ## ライセンス
 

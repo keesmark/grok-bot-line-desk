@@ -14,24 +14,24 @@ A Grok Bot template cannot carry scripts, so they live here and are distributed 
 - `routines/line-webhook.md`: the prompt of the inbound routine 「LINE受信の記録」.
 - `VERSION`: the version. The tag is `v` followed by VERSION (`0.1.0` → `v0.1.0`).
 - `CHANGELOG.md`: changes per version.
-- `MIGRATIONS.md`: manual steps when upgrading. The update skill reads it.
+- `MIGRATIONS.md`: manual steps when upgrading. The desk-update skill reads it.
 - `SHA256SUMS`: checksums of every file the bot receives (scripts, skills, routines, VERSION, CHANGELOG, MIGRATIONS). `SHA256SUMS.asc` is its signature.
-- `keys/release.asc`: the public signing key (fingerprint `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`). The update skill carries the same key.
+- `keys/release.asc`: the public signing key (fingerprint `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`). The desk-update skill carries the same key.
 - `tools/`, `tests/`: for people changing this repository. They are not installed in the bot.
 
 ## Installing and verifying
 
-`SHA256SUMS` is signed with the author's (keesmark's) GPG key, and the bot checks the signature before installing. The public key and its fingerprint used for the check live in the template's update skill. Even if this repository were taken over, nobody can make a valid signature without the author's private key, so a fake version is not installed.
+`SHA256SUMS` is signed with the author's (keesmark's) GPG key, and the bot checks the signature before installing. The public key and its fingerprint used for the check live in the template's desk-update skill. Even if this repository were taken over, nobody can make a valid signature without the author's private key, so a fake version is not installed.
 
 ```mermaid
 flowchart LR
-  K[Template's update skill<br>public key and fingerprint] --> B[Bot]
+  K[Template's desk-update skill<br>public key and fingerprint] --> B[Bot]
   R[GitHub tag<br>v + VERSION] -->|tar.gz| B
   B -->|fingerprint matches, signature is good,<br>scripts match SHA256SUMS| W["/workspace/line-inbox/bin/"]
   B -.->|anything differs| S[Stop and tell the owner]
 ```
 
-Normally the template's getting-started skill has the bot do the following. When installing by hand, take the public key from the template's update skill rather than from this repository, or check that its fingerprint is `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`.
+Normally the template's desk-getting-started skill has the bot do the following. When installing by hand, take the public key from the template's desk-update skill rather than from this repository, or check that its fingerprint is `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`.
 
 ```sh
 tmp=$(mktemp -d) && cd "$tmp"
@@ -55,8 +55,8 @@ rm -rf "$g"
 
 ## Checking the version and updating
 - Installed version: `cat /workspace/line-inbox/bin/VERSION`. Unchanged contents: `cd /workspace/line-inbox/bin && { sed -n 's#  scripts/#  #p' SHA256SUMS; grep '  VERSION$' SHA256SUMS; } | sha256sum -c`.
-- Latest version: the latest [Release](https://github.com/keesmark/grok-bot-line-desk/releases/latest). `VERSION` on main is not used, since it may be bumped before the Release. Ask the bot 「更新はある？」 and the update skill checks.
-- Updates are never installed automatically. The update skill shows what changed and replaces the scripts only when the owner says 「更新」.
+- Latest version: the latest [Release](https://github.com/keesmark/grok-bot-line-desk/releases/latest). `VERSION` on main is not used, since it may be bumped before the Release. Ask the bot 「更新はある？」 and the desk-update skill checks.
+- Updates are never installed automatically. The desk-update skill shows what changed and replaces the scripts only when the owner says 「更新」.
 
 ## Changing this repository
 
@@ -76,7 +76,7 @@ Releasing:
 1. Bump `VERSION` and add a `## v<version>` section to `CHANGELOG.md` and `MIGRATIONS.md` (write 「なし」 when there is nothing to do by hand).
 2. On the author's computer, run `python3 tools/release.py` (it syncs and signs in one go; gpg asks for the passphrase). Open a PR and merge it.
 3. Tag the merged commit `v<version>` and create a Release.
-4. Set 「Desk for LINE の版」 in the template memory to the new version and publish the template again (existing users update through the update skill, so this is not required for them).
+4. Set 「Desk for LINE の版」 in the template memory to the new version and publish the template again (existing users update through the desk-update skill, so this is not required for them).
 
 ## License
 

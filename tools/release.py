@@ -7,7 +7,7 @@ Without --verify: runs tools/sync.py and, unless SHA256SUMS.asc already
 passes the checks below, signs SHA256SUMS with the release key from your own
 gpg keyring (gpg asks for the passphrase) into SHA256SUMS.asc, then checks.
 
---verify checks that the key block in skills/update/SKILL.md is the same as
+--verify checks that the key block in skills/desk-update/SKILL.md is the same as
 keys/release.asc, that the key's fingerprint is the 「鍵の番号」 in that skill
 and appears in both READMEs, and that SHA256SUMS.asc is a good signature
 (GOODSIG and VALIDSIG) of SHA256SUMS by that key. Changes nothing. CI runs it.
@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sync
 
 ROOT = sync.ROOT
-SKILL = "skills/update/SKILL.md"
+SKILL = "skills/desk-update/SKILL.md"
 KEY = "keys/release.asc"
 READMES = ("README.md", "README.en.md")
 KEY_RE = re.compile(r"^-----BEGIN PGP PUBLIC KEY BLOCK-----$.*?^-----END PGP PUBLIC KEY BLOCK-----$",

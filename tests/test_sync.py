@@ -18,9 +18,9 @@ FILES = {
     "VERSION": "0.2.0\n",
     "scripts/b.py": "print('b')\n",
     "scripts/a.py": "print('a')\n",
-    "skills/getting-started/SKILL.md":
+    "skills/desk-getting-started/SKILL.md":
         "版：Desk for LINE v0.1.0\ncurl https://github.com/x/y/archive/refs/tags/v0.1.0.tar.gz\n",
-    "skills/reply/SKILL.md": "# reply\n\n版：Desk for LINE v0.1.0\n",
+    "skills/desk-reply/SKILL.md": "# reply\n\n版：Desk for LINE v0.1.0\n",
     "routines/line-webhook.md": "- 版：Desk for LINE v0.1.0。\n",
     "README.md": "curl -o a.tgz https://github.com/x/y/archive/refs/tags/v0.1.0.tar.gz\n",
     "README.en.md": "curl -o a.tgz https://github.com/x/y/archive/refs/tags/v0.1.0.tar.gz\n",
@@ -56,16 +56,16 @@ class SyncTest(unittest.TestCase):
 
     def expected_sums(self):
         names = ["CHANGELOG.md", "MIGRATIONS.md", "VERSION", "routines/line-webhook.md", "scripts/a.py",
-                 "scripts/b.py", "skills/getting-started/SKILL.md", "skills/reply/SKILL.md"]
+                 "scripts/b.py", "skills/desk-getting-started/SKILL.md", "skills/desk-reply/SKILL.md"]
         return "".join("%s  %s\n" % (digest(self.text(name)), name) for name in names)
 
     def test_writes_sums_labels_and_tags(self):
         code, out, err = self.run_sync()
         self.assertEqual(code, 0, err)
         self.assertEqual(self.text("SHA256SUMS"), self.expected_sums())
-        self.assertEqual(self.text("skills/reply/SKILL.md"), "# reply\n\n版：Desk for LINE v0.2.0\n")
+        self.assertEqual(self.text("skills/desk-reply/SKILL.md"), "# reply\n\n版：Desk for LINE v0.2.0\n")
         self.assertEqual(self.text("routines/line-webhook.md"), "- 版：Desk for LINE v0.2.0。\n")
-        self.assertEqual(self.text("skills/getting-started/SKILL.md"),
+        self.assertEqual(self.text("skills/desk-getting-started/SKILL.md"),
                          "版：Desk for LINE v0.2.0\ncurl https://github.com/x/y/archive/refs/tags/v0.2.0.tar.gz\n")
         self.assertIn("/archive/refs/tags/v0.2.0.tar.gz", self.text("README.md"))
         self.assertIn("/archive/refs/tags/v0.2.0.tar.gz", self.text("README.en.md"))
@@ -95,7 +95,7 @@ class SyncTest(unittest.TestCase):
 
     def test_sums_cover_rewritten_skills(self):
         self.run_sync()
-        self.assertIn("%s  skills/reply/SKILL.md\n" % digest("# reply\n\n版：Desk for LINE v0.2.0\n"),
+        self.assertIn("%s  skills/desk-reply/SKILL.md\n" % digest("# reply\n\n版：Desk for LINE v0.2.0\n"),
                       self.text("SHA256SUMS"))
 
     def test_check_detects_changed_script(self):
