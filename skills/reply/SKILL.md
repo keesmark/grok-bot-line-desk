@@ -5,7 +5,7 @@ description: 社長が返信したいとき（「3に返信」など）に使い
 
 # 返信案と送信
 
-版：Desk for LINE v0.1
+版：Desk for LINE v0.1.0
 
 - スクリプトは `/workspace/line-inbox/bin/` のものを `DESK_DB=<保存先> python3` で実行（保存先はメモリの設定）。道具は `push_text_message`・`get_message_quota`・`get_profile` だけ。
 - 承認・送信・定型文・名前・数字・キーワード応答の自動送信はメモリの「決まり」のとおり。

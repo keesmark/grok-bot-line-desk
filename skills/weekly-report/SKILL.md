@@ -5,7 +5,7 @@ description: 「週報を見せて」「今週どうだった？」と言われ�
 
 # 週報
 
-版：Desk for LINE v0.1
+版：Desk for LINE v0.1.0
 
 ## 数える
 - 指定がなければこの1週間：`DESK_DB=<保存先> python3 /workspace/line-inbox/bin/stats.py --days 7 --json`（保存先はメモリの設定。ほかのスクリプトも同じ形）

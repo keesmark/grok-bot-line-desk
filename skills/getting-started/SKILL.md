@@ -5,7 +5,7 @@ description: 最初の会話で使います。あいさつと商標の注記を�
 
 # はじめての設定
 
-版：Desk for LINE v0.1
+版：Desk for LINE v0.1.0
 
 ## 最初に伝えること
 > はじめまして、Desk for LINEです。LINE公式アカウントに届いた問い合わせのお知らせ、要約、返信案、お店のお知らせの下書きをします。お客様に送るのは社長のOKのあとだけです（例外は、社長が自分でオンにした設定だけ）。返信は、社長が番号で「送信」と言った1件だけ送ります。
@@ -23,8 +23,8 @@ description: 最初の会話で使います。あいさつと商標の注記を�
    - 保存先を決める：このボットのプロフィールのフォルダ /home/box/agent-data/agents/<agent id>/ の agent id を使い、`/workspace/line-inbox/<agent id>/messages.db` にする（表示名は変わるので使わない）。分からなければ社長に英数字の短い名前を決めてもらう。メモリの「保存先」に書く。ほかのボットの保存先や /workspace/line-inbox/messages.db（前の版の共有の場所）は使わない。前の版の記録があれば勝手に移さず、READMEの移し方を案内する。
    - ここから先のスクリプトはすべて `DESK_DB=<保存先> python3 /workspace/line-inbox/bin/<名前>` で動かす（DESK_DB がないと止まる）。
    - スクリプトを入れる（テンプレートには入っていない。版と照合値はメモリの「Desk for LINE の版」「照合値」）。
-     - 先に /workspace/line-inbox/bin/ を見る。`VERSION` がメモリの版と同じ（`0.1.0` が v0.1）で、bin で `sha256sum -c SHA256SUMS` が全部 OK なら入れ直さない。bin は同じコンピューターのボットで共有なので、別の版・`VERSION` なしでスクリプトがある・照合が合わない、のどれかなら上書きする前に社長に確かめる。
-     - 一時フォルダ（mktemp -d）で `curl -fsSL -o a.tgz https://github.com/keesmark/desk-for-line/archive/refs/tags/v0.1.tar.gz`、`tar -xzf a.tgz --strip-components=1`。
+     - 先に /workspace/line-inbox/bin/ を見る。`VERSION` がメモリの版と同じで、bin で `sha256sum -c SHA256SUMS` が全部 OK なら入れ直さない。bin は同じコンピューターのボットで共有なので、別の版・`VERSION` なしでスクリプトがある・照合が合わない、のどれかなら上書きする前に社長に確かめる。
+     - 一時フォルダ（mktemp -d）で `curl -fsSL -o a.tgz https://github.com/keesmark/grok-bot-line-desk/archive/refs/tags/v0.1.0.tar.gz`、`tar -xzf a.tgz --strip-components=1`。
      - 照合：`sha256sum SHA256SUMS` がメモリの「照合値」と同じ、かつ `cd scripts && sha256sum -c ../SHA256SUMS` が全部 OK。合わない・取れないときは止めて社長に伝える（自分で書かない、ほかから取らない）。
      - `mkdir -p /workspace/line-inbox/bin` して scripts/*.py・VERSION・SHA256SUMS を写し、`chmod 700 /workspace/line-inbox/bin/*.py`。一時フォルダを消す。
    - `DESK_DB=<保存先> python3 /workspace/line-inbox/bin/init_db.py` を実行し（やり直しても安全。フォルダも作る）、「ok, database ready」を確かめる。

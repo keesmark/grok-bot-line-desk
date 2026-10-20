@@ -1,7 +1,7 @@
 # LINE受信の記録
 - トリガー: webhook（LINE公式アカウント → Messaging APIのWebhook → 中継（Worker） → このルーティン。サイドバーのURLと送信キーは getting-started の手順5）
 - 使う道具: シェル（/workspace/line-inbox/bin/ のスクリプト）、ファイルの読み書き（一時ファイル、away.json）、line-oa の get_profile（表示名を読むだけ）と push_text_message（自動送信がオンのキーワード応答だけ）
-- 版：Desk for LINE v0.1。保存するとき `<保存先>` をメモリの「保存先」に置き換える。
+- 版：Desk for LINE v0.1.0。保存するとき `<保存先>` をメモリの「保存先」に置き換える。
 
 ## 保存するプロンプト
 ```text

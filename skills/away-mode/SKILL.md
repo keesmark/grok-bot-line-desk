@@ -5,7 +5,7 @@ description: 社長が「不在にする」「出かける」「戻った」と�
 
 # 不在モード
 
-版：Desk for LINE v0.1
+版：Desk for LINE v0.1.0
 
 状態は保存先（メモリの設定）と同じフォルダの `away.json` に置く：`{"away": true, "interval_minutes": <分>, "started_at": "<日時>", "last_bundle_at": "<日時>"}`（日時はタイムゾーン付き）。
 

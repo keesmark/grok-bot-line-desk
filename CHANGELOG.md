@@ -1,6 +1,6 @@
 # 変更の記録
 
-## v0.1（0.1.0）2026-10-20
+## v0.1.0（2026-10-20）
 最初の公開版です。Grok Bot のテンプレート「Desk for LINE」が使うスクリプト・スキル・ルーティンをまとめました。
 
 - スクリプト 14 本（Python 3 の標準ライブラリだけ）：init_db、log_event、list_unreplied、set_status、mark_read、quota_check、stats、purge_old、profile_cache、canned、save_media、broadcast_prep、keyword_reply、account。
