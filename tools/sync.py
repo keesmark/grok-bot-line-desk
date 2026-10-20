@@ -7,8 +7,7 @@ Rewrites SHA256SUMS from scripts/*.py, the 「版：Desk for LINE v…」 line o
 every skills/*/SKILL.md and routines/*.md, and the release tag in the
 download URLs of README.md, README.en.md and skills/getting-started/SKILL.md.
 CHANGELOG.md and MIGRATIONS.md must already have a "## v<VERSION>" section.
-Prints the tag and the SHA256SUMS digest that go in the template memory
-(「Desk for LINE の版」 and 「照合値」).
+tools/release.py runs this before it signs SHA256SUMS.
 
 --check changes nothing and exits 1 when a file is out of date.
 Exit: 0 ok, 1 out of date or a section/label is missing, 2 cannot read.
@@ -84,7 +83,6 @@ def main(argv=None, root=ROOT):
     for problem in problems:
         print("error: %s" % problem, file=sys.stderr)
     print("tag: %s" % tag)
-    print("SHA256SUMS sha256: %s" % hashlib.sha256(wanted[root / "SHA256SUMS"].encode("utf-8")).hexdigest())
     return 1 if problems else 0
 
 

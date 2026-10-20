@@ -69,7 +69,6 @@ class SyncTest(unittest.TestCase):
         self.assertIn("/archive/refs/tags/v0.2.0.tar.gz", self.text("README.en.md"))
         self.assertIn("updated SHA256SUMS", out)
         self.assertIn("tag: v0.2.0", out)
-        self.assertIn("SHA256SUMS sha256: %s" % digest(self.expected_sums()), out)
 
     def test_second_run_changes_nothing(self):
         self.run_sync()

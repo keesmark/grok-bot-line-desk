@@ -15,32 +15,37 @@ Grok Bot のテンプレート「Desk for LINE」で使うスクリプト・ス�
 - `VERSION`：版。タグは `v` と VERSION をつなげたものです（`0.1.0` → `v0.1.0`）。
 - `CHANGELOG.md`：版ごとの変更。
 - `MIGRATIONS.md`：版を上げるときに手でやる作業。update スキルが読みます。
-- `SHA256SUMS`：`scripts/` の照合値。
+- `SHA256SUMS`：`scripts/` の照合値。`SHA256SUMS.asc` はその署名です。
+- `keys/release.asc`：署名の公開鍵（鍵の番号 `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`）。update スキルの中にも同じ鍵があります。
 - `tools/`、`tests/`：このリポジトリを直す人のためのもの。ボットには入れません。
 
-## 入れ方と照合
+## 入れ方と確かめ方
 
-照合の基準は、テンプレートのメモリに書いてある「照合値」（`SHA256SUMS` 自体の sha256）です。このリポジトリの `SHA256SUMS` は、リポジトリが乗っ取られると中身と一緒に書き換えられるので、それだけでは信用しません。
+`SHA256SUMS` は作者（keesmark）の GPG の鍵で署名してあり、ボットは署名を確かめてから入れます。確かめに使う公開鍵と鍵の番号は、テンプレートの update スキルの中にあります。このリポジトリが乗っ取られても、作者の秘密鍵がなければ署名は作れないので、偽の版は入りません。
 
 ```mermaid
 flowchart LR
-  M[テンプレートのメモリ<br>版と照合値] --> B[ボット]
+  K[テンプレートの update スキル<br>公開鍵と鍵の番号] --> B[ボット]
   R[GitHub のタグ<br>v + VERSION] -->|tar.gz| B
-  B -->|SHA256SUMS の sha256 が照合値と同じ<br>かつ scripts が SHA256SUMS と同じ| W["/workspace/line-inbox/bin/"]
-  B -.->|どちらかが違う| S[止めて社長に伝える]
+  B -->|鍵の番号が同じ・署名が正しい<br>scripts が SHA256SUMS と同じ| W["/workspace/line-inbox/bin/"]
+  B -.->|どれかが違う| S[止めて社長に伝える]
 ```
 
-ふつうはテンプレートの getting-started スキルが、ボットに次のことをさせます。手で入れるときも同じです。
+ふつうはテンプレートの getting-started スキルが、ボットに次のことをさせます。手で入れるときは、公開鍵をこのリポジトリではなくテンプレートの update スキルから取るか、鍵の番号が `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94` であることを確かめてください。
 
 ```sh
 tmp=$(mktemp -d) && cd "$tmp"
 curl -fsSL -o a.tgz https://github.com/keesmark/grok-bot-line-desk/archive/refs/tags/v0.1.0.tar.gz
 tar -xzf a.tgz --strip-components=1
-sha256sum SHA256SUMS                         # テンプレートのメモリの「照合値」と同じでなければ止める
+g=$(mktemp -d)
+GNUPGHOME="$g" gpg --batch --quiet --import keys/release.asc
+GNUPGHOME="$g" gpg --batch --with-colons --list-keys | awk -F: '/^fpr/{print $10; exit}'   # F136EFC61A9D82927C3243EE0FAD42251453DA94 でなければ止める
+GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null | grep '^\[GNUPG:\] VALIDSIG F136EFC61A9D82927C3243EE0FAD42251453DA94 '   # 出なければ止める
 (cd scripts && sha256sum -c ../SHA256SUMS)   # 全部 OK でなければ止める
 mkdir -p /workspace/line-inbox/bin
-cp scripts/*.py VERSION SHA256SUMS /workspace/line-inbox/bin/
+cp scripts/*.py VERSION SHA256SUMS SHA256SUMS.asc /workspace/line-inbox/bin/
 chmod 700 /workspace/line-inbox/bin/*.py
+rm -rf "$g"
 ```
 
 `/workspace/line-inbox/bin/` は同じコンピューターのボットで共有です。すでに別の版が入っていたら、上書きする前に確かめてください。スクリプトはいつも `DESK_DB=<このボットの保存先> python3 /workspace/line-inbox/bin/<名前>` で動かします。
@@ -61,14 +66,14 @@ python3 -m venv .venv
 .venv/bin/coverage report
 ```
 
-スクリプトやスキルを直したら、`python3 tools/sync.py` で `SHA256SUMS`、スキルとルーティンの「版：」の行、README とスキルのダウンロード URL のタグを、`VERSION` にそろえます。そろっていないと CI（`tools/sync.py --check`）が落ちます。
+スクリプトやスキルを直したら、`python3 tools/sync.py` で `SHA256SUMS`、スキルとルーティンの「版：」の行、README とスキルのダウンロード URL のタグを、`VERSION` にそろえます。そろっていないと CI（`tools/sync.py --check`）が落ちます。`SHA256SUMS` が変わったら署名もし直す必要があり、署名が合っていないと CI（`tools/release.py --verify`）が落ちます。
 
 版を出す手順：
 
 1. `VERSION` を上げ、`CHANGELOG.md` と `MIGRATIONS.md` に `## v<版>` の節を足す（手作業がなければ「なし」）。
-2. `python3 tools/sync.py` を実行し、PR にしてマージする。
+2. 作者の PC で `python3 tools/release.py` を実行する（そろえ直しと署名をまとめて行い、gpg がパスフレーズを聞きます）。PR にしてマージする。
 3. マージしたコミットにタグ `v<版>` を付け、Release を作る。
-4. `tools/sync.py` が出した「SHA256SUMS sha256」を、テンプレートのメモリの「照合値」に、版を「Desk for LINE の版」に書き、テンプレートを出し直す。
+4. テンプレートのメモリの「Desk for LINE の版」を新しい版にし、テンプレートを出し直す（すでに使っている人は update スキルで更新するので、出し直さなくても動きます）。
 
 ## ライセンス
 

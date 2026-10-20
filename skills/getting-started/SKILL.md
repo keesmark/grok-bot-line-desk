@@ -22,11 +22,11 @@ description: 最初の会話で使います。あいさつと商標の注記を�
 0. 道具がそろっているか確かめる
    - 保存先を決める：このボットのプロフィールのフォルダ /home/box/agent-data/agents/<agent id>/ の agent id を使い、`/workspace/line-inbox/<agent id>/messages.db` にする（表示名は変わるので使わない）。分からなければ社長に英数字の短い名前を決めてもらう。メモリの「保存先」に書く。ほかのボットの保存先や /workspace/line-inbox/messages.db（前の版の共有の場所）は使わない。前の版の記録があれば勝手に移さず、READMEの移し方を案内する。
    - ここから先のスクリプトはすべて `DESK_DB=<保存先> python3 /workspace/line-inbox/bin/<名前>` で動かす（DESK_DB がないと止まる）。
-   - スクリプトを入れる（テンプレートには入っていない。版と照合値はメモリの「Desk for LINE の版」「照合値」）。
-     - 先に /workspace/line-inbox/bin/ を見る。`VERSION` がメモリの版と同じで、bin で `sha256sum -c SHA256SUMS` が全部 OK なら入れ直さない。bin は同じコンピューターのボットで共有なので、別の版・`VERSION` なしでスクリプトがある・照合が合わない、のどれかなら上書きする前に社長に確かめる。
+   - スクリプトを入れる（テンプレートには入っていない。版はメモリの「Desk for LINE の版」。確かめ方は update スキルの「署名の確かめ方」）。
+     - 先に /workspace/line-inbox/bin/ を見る。`VERSION` がメモリの版と同じで、bin で「署名の確かめ方」が通れば入れ直さない。bin は同じコンピューターのボットで共有なので、別の版・`VERSION` なしでスクリプトがある・確かめ方が通らない、のどれかなら上書きする前に社長に確かめる。
      - 一時フォルダ（mktemp -d）で `curl -fsSL -o a.tgz https://github.com/keesmark/grok-bot-line-desk/archive/refs/tags/v0.1.0.tar.gz`、`tar -xzf a.tgz --strip-components=1`。
-     - 照合：`sha256sum SHA256SUMS` がメモリの「照合値」と同じ、かつ `cd scripts && sha256sum -c ../SHA256SUMS` が全部 OK。合わない・取れないときは止めて社長に伝える（自分で書かない、ほかから取らない）。
-     - `mkdir -p /workspace/line-inbox/bin` して scripts/*.py・VERSION・SHA256SUMS を写し、`chmod 700 /workspace/line-inbox/bin/*.py`。一時フォルダを消す。
+     - 取ってきたフォルダで「署名の確かめ方」を行い、`VERSION` がメモリの版と同じか確かめる。通らない・取れないときは止めて社長に伝える（自分で書かない、ほかから取らない）。
+     - `mkdir -p /workspace/line-inbox/bin` して scripts/*.py・VERSION・SHA256SUMS・SHA256SUMS.asc を写し、`chmod 700 /workspace/line-inbox/bin/*.py`。一時フォルダを消す。
    - `DESK_DB=<保存先> python3 /workspace/line-inbox/bin/init_db.py` を実行し（やり直しても安全。フォルダも作る）、「ok, database ready」を確かめる。
    - 受信のルーティン「LINE受信の記録」（Webhookトリガー）があるか見る。取り込みで作られないことがあるので、なければWebhookトリガーで作り、テンプレートの line-webhook ルーティンのプロンプトを、`<保存先>` をこのボットの保存先に置き換えて使う（log_event.py で記録、save_media.py で保存、keyword_reply.py で照合、知らせる。送るのはキーワード応答の自動送信がオンのときの登録の返事だけ。既読をつけない）。サイドバーのWebhook URLと送信キーは手順5で使う。したことを社長に伝える。
 1. フォーク（中継のしくみを自分のGitHubに写す）：https://github.com/keesmark/grok-bot-line-relay/fork で「Create fork」を押してもらう。公開でよい（秘密の値は入らない）。できたと聞けば完了。
