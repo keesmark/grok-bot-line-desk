@@ -25,7 +25,7 @@ Grok Bot のテンプレート「Desk for LINE」で使うスクリプト・ス�
 ```mermaid
 flowchart LR
   M[テンプレートのメモリ<br>版と照合値] --> B[ボット]
-  R[GitHub のタグ<br>v0.1.0] -->|tar.gz| B
+  R[GitHub のタグ<br>v + VERSION] -->|tar.gz| B
   B -->|SHA256SUMS の sha256 が照合値と同じ<br>かつ scripts が SHA256SUMS と同じ| W["/workspace/line-inbox/bin/"]
   B -.->|どちらかが違う| S[止めて社長に伝える]
 ```
@@ -47,7 +47,7 @@ chmod 700 /workspace/line-inbox/bin/*.py
 
 ## 版の確かめ方と更新
 - 入っている版：`cat /workspace/line-inbox/bin/VERSION`。中身が変わっていないか：`cd /workspace/line-inbox/bin && sha256sum -c SHA256SUMS`。
-- 新しい版：`https://raw.githubusercontent.com/keesmark/grok-bot-line-desk/main/VERSION` と `CHANGELOG.md`。ボットに「更新はある？」と聞くと、update スキルが確かめます。
+- 新しい版：最新の [Release](https://github.com/keesmark/grok-bot-line-desk/releases/latest)。main の `VERSION` は Release の前に上がることがあるので見ません。ボットに「更新はある？」と聞くと、update スキルが確かめます。
 - 更新は自動では入りません。update スキルが変更点を見せ、社長が「更新」と言ったときだけ入れ替えます。
 
 ## 直すとき（このリポジトリを直す人へ）

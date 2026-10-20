@@ -25,7 +25,7 @@ The trust anchor is the 「照合値」 written in the template's memory (the sh
 ```mermaid
 flowchart LR
   M[Template memory<br>version and checksum] --> B[Bot]
-  R[GitHub tag<br>v0.1.0] -->|tar.gz| B
+  R[GitHub tag<br>v + VERSION] -->|tar.gz| B
   B -->|sha256 of SHA256SUMS matches<br>and scripts match SHA256SUMS| W["/workspace/line-inbox/bin/"]
   B -.->|either one differs| S[Stop and tell the owner]
 ```
@@ -47,7 +47,7 @@ chmod 700 /workspace/line-inbox/bin/*.py
 
 ## Checking the version and updating
 - Installed version: `cat /workspace/line-inbox/bin/VERSION`. Unchanged contents: `cd /workspace/line-inbox/bin && sha256sum -c SHA256SUMS`.
-- Latest version: `https://raw.githubusercontent.com/keesmark/grok-bot-line-desk/main/VERSION` and `CHANGELOG.md`. Ask the bot 「更新はある？」 and the update skill checks.
+- Latest version: the latest [Release](https://github.com/keesmark/grok-bot-line-desk/releases/latest). `VERSION` on main is not used, since it may be bumped before the Release. Ask the bot 「更新はある？」 and the update skill checks.
 - Updates are never installed automatically. The update skill shows what changed and replaces the scripts only when the owner says 「更新」.
 
 ## Changing this repository

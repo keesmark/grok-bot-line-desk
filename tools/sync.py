@@ -56,6 +56,8 @@ def plan(root):
     for name in TAGGED:
         path = root / name
         text = wanted[path] if path in wanted else read(path)
+        if not TAG_RE.search(text):
+            problems.append("%s: no /archive/refs/tags/v….tar.gz URL" % name)
         wanted[path] = TAG_RE.sub(r"\g<1>" + tag, text)
     for name in SECTIONED:
         if not re.search(r"^## %s(?![\d.])" % re.escape(tag), read(root / name), re.M):
@@ -70,15 +72,15 @@ def main(argv=None, root=ROOT):
     try:
         tag, wanted, problems = plan(root)
         stale = [p for p, text in wanted.items() if not p.exists() or read(p) != text]
+        for path in stale:
+            if args.check:
+                problems.append("%s: out of date (run tools/sync.py)" % path.relative_to(root))
+            else:
+                path.write_bytes(wanted[path].encode("utf-8"))
+                print("updated %s" % path.relative_to(root))
     except (Fail, OSError, UnicodeDecodeError) as e:
         print("error: %s" % e, file=sys.stderr)
         return 2
-    for path in stale:
-        if args.check:
-            problems.append("%s: out of date (run tools/sync.py)" % path.relative_to(root))
-        else:
-            path.write_bytes(wanted[path].encode("utf-8"))
-            print("updated %s" % path.relative_to(root))
     for problem in problems:
         print("error: %s" % problem, file=sys.stderr)
     print("tag: %s" % tag)

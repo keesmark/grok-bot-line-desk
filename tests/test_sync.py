@@ -118,6 +118,18 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn('MIGRATIONS.md: no "## v0.2.0" section', err)
 
+    def test_reports_readme_without_download_url(self):
+        (self.root / "README.en.md").write_text("see the releases page\n", encoding="utf-8")
+        code, _, err = self.run_sync("--check")
+        self.assertEqual(code, 1)
+        self.assertIn("README.en.md: no /archive/refs/tags/v….tar.gz URL", err)
+
+    def test_reports_write_failure(self):
+        with mock.patch.object(Path, "write_bytes", side_effect=PermissionError("read-only")):
+            code, _, err = self.run_sync()
+        self.assertEqual(code, 2)
+        self.assertIn("read-only", err)
+
     def test_rejects_malformed_version(self):
         (self.root / "VERSION").write_text("0.2\n", encoding="utf-8")
         code, _, err = self.run_sync()
