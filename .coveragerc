@@ -1,0 +1,6 @@
+[run]
+source = tools
+branch = true
+
+[report]
+show_missing = true
