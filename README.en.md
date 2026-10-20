@@ -42,13 +42,15 @@ GNUPGHOME="$g" gpg --batch --quiet --import keys/release.asc
 GNUPGHOME="$g" gpg --batch --with-colons --list-keys | awk -F: '/^fpr/{print $10; exit}'   # stop unless F136EFC61A9D82927C3243EE0FAD42251453DA94
 GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null | grep -cE '^\[GNUPG:\] (GOODSIG |VALIDSIG F136EFC61A9D82927C3243EE0FAD42251453DA94 )'   # stop unless it prints 2
 sha256sum -c SHA256SUMS   # stop unless every line is OK
+diff <(find scripts skills routines -type f | LC_ALL=C sort) <(awk '{print $2}' SHA256SUMS | grep -E '^(scripts|skills|routines)/' | LC_ALL=C sort)   # stop unless equal (a file outside the signature was added)
 mkdir -p /workspace/line-inbox/bin
-cp scripts/*.py VERSION SHA256SUMS SHA256SUMS.asc /workspace/line-inbox/bin/
+sed -n 's#^[0-9a-f]\{64\}  scripts/\([a-z_]*\.py\)$#\1#p' SHA256SUMS | while read -r f; do cp "scripts/$f" /workspace/line-inbox/bin/; done
+cp VERSION SHA256SUMS SHA256SUMS.asc /workspace/line-inbox/bin/
 chmod 700 /workspace/line-inbox/bin/*.py
 rm -rf "$g"
 ```
 
-`/workspace/line-inbox/bin/` is shared by the bots on the same computer. If another version is already there, check before overwriting it. Always run the scripts as `DESK_DB=<this bot's database path> python3 /workspace/line-inbox/bin/<name>`.
+`/workspace/line-inbox/bin/` is shared by the bots on the same computer. If another version is already there, check before overwriting it. Always run the scripts as `DESK_DB=<this bot's database path> python3 -I /workspace/line-inbox/bin/<name>`.
 
 ## Checking the version and updating
 - Installed version: `cat /workspace/line-inbox/bin/VERSION`. Unchanged contents: `cd /workspace/line-inbox/bin && { sed -n 's#  scripts/#  #p' SHA256SUMS; grep '  VERSION$' SHA256SUMS; } | sha256sum -c`.

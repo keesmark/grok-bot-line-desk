@@ -7,7 +7,7 @@ description: 「未返信は？」「問い合わせをまとめて」「残り�
 
 版：Desk for LINE v0.1.0
 
-スクリプトは `DESK_DB=<保存先> python3 /workspace/line-inbox/bin/<名前>` で実行する（保存先はメモリの設定）。別のアカウント宛ての記録は一覧に出ない（数は `account.py show`）。
+スクリプトは `DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/<名前>` で実行する（保存先はメモリの設定）。別のアカウント宛ての記録は一覧に出ない（数は `account.py show`）。
 
 ## 出し方
 1. `list_unreplied.py --json --include-groups`。DBがなければ `init_db.py` のあとやり直す。

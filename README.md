@@ -42,13 +42,15 @@ GNUPGHOME="$g" gpg --batch --quiet --import keys/release.asc
 GNUPGHOME="$g" gpg --batch --with-colons --list-keys | awk -F: '/^fpr/{print $10; exit}'   # F136EFC61A9D82927C3243EE0FAD42251453DA94 でなければ止める
 GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null | grep -cE '^\[GNUPG:\] (GOODSIG |VALIDSIG F136EFC61A9D82927C3243EE0FAD42251453DA94 )'   # 2 でなければ止める
 sha256sum -c SHA256SUMS   # 全部 OK でなければ止める
+diff <(find scripts skills routines -type f | LC_ALL=C sort) <(awk '{print $2}' SHA256SUMS | grep -E '^(scripts|skills|routines)/' | LC_ALL=C sort)   # 同じでなければ止める（署名にないファイルが混ざっている）
 mkdir -p /workspace/line-inbox/bin
-cp scripts/*.py VERSION SHA256SUMS SHA256SUMS.asc /workspace/line-inbox/bin/
+sed -n 's#^[0-9a-f]\{64\}  scripts/\([a-z_]*\.py\)$#\1#p' SHA256SUMS | while read -r f; do cp "scripts/$f" /workspace/line-inbox/bin/; done
+cp VERSION SHA256SUMS SHA256SUMS.asc /workspace/line-inbox/bin/
 chmod 700 /workspace/line-inbox/bin/*.py
 rm -rf "$g"
 ```
 
-`/workspace/line-inbox/bin/` は同じコンピューターのボットで共有です。すでに別の版が入っていたら、上書きする前に確かめてください。スクリプトはいつも `DESK_DB=<このボットの保存先> python3 /workspace/line-inbox/bin/<名前>` で動かします。
+`/workspace/line-inbox/bin/` は同じコンピューターのボットで共有です。すでに別の版が入っていたら、上書きする前に確かめてください。スクリプトはいつも `DESK_DB=<このボットの保存先> python3 -I /workspace/line-inbox/bin/<名前>` で動かします。
 
 ## 版の確かめ方と更新
 - 入っている版：`cat /workspace/line-inbox/bin/VERSION`。中身が変わっていないか：`cd /workspace/line-inbox/bin && { sed -n 's#  scripts/#  #p' SHA256SUMS; grep '  VERSION$' SHA256SUMS; } | sha256sum -c`。

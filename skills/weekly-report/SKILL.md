@@ -8,7 +8,7 @@ description: 「週報を見せて」「今週どうだった？」と言われ�
 版：Desk for LINE v0.1.0
 
 ## 数える
-- 指定がなければこの1週間：`DESK_DB=<保存先> python3 /workspace/line-inbox/bin/stats.py --days 7 --json`（保存先はメモリの設定。ほかのスクリプトも同じ形）
+- 指定がなければこの1週間：`DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/stats.py --days 7 --json`（保存先はメモリの設定。ほかのスクリプトも同じ形）
 - 期間の指定があれば `--since YYYY-MM-DD --until YYYY-MM-DD`。
 - 残り通数：`quota_check.py --json --no-update`（お知らせの記録を変えずに読む）。読めなければ「不明」。
 - 数字はこの結果だけ。ボットは数えない、計算しない、推測しない。文章にするだけ。

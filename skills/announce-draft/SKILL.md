@@ -25,7 +25,7 @@ description: 「お知らせを作って」「臨時休業を知らせたい」�
 
 ## ボットから直接
 
-スクリプト：`DESK_DB=<保存先> python3 /workspace/line-inbox/bin/<名前>`（保存先はメモリの設定）
+スクリプト：`DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/<名前>`（保存先はメモリの設定）
 
 1. 下書きを一時ファイルに保存。`quota_check.py --peek --json` で今月の残りを読み、`broadcast_prep.py --text-file <一時ファイル> --remaining <残り>`（不明なら --remaining なし）。exit 3：残った差し込みの中身を社長に聞く（推測で埋めない）。exit 2：下書きを直す（5000文字まで）。
 2. 送る文の全文、送る相手「友だち全員（人数は管理画面で確認）」、友だちの人数分の通数を使うこと、今月の残りを見せる。

@@ -21,13 +21,13 @@ description: 最初の会話で使います。あいさつと商標の注記を�
 
 0. 道具がそろっているか確かめる
    - 保存先を決める：このボットのプロフィールのフォルダ /home/box/agent-data/agents/<agent id>/ の agent id を使い、`/workspace/line-inbox/<agent id>/messages.db` にする（表示名は変わるので使わない）。分からなければ社長に英数字の短い名前を決めてもらう。メモリの「保存先」に書く。ほかのボットの保存先や /workspace/line-inbox/messages.db（前の版の共有の場所）は使わない。前の版の記録があれば勝手に移さず、READMEの移し方を案内する。
-   - ここから先のスクリプトはすべて `DESK_DB=<保存先> python3 /workspace/line-inbox/bin/<名前>` で動かす（DESK_DB がないと止まる）。
+   - ここから先のスクリプトはすべて `DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/<名前>` で動かす（DESK_DB がないと止まる）。
    - スクリプトを入れる（テンプレートには入っていない。版はメモリの「Desk for LINE の版」。確かめ方は update スキルの「署名の確かめ方」）。
      - 先に /workspace/line-inbox/bin/ を見る。`VERSION` がメモリの版と同じで、bin で「署名の確かめ方」が通れば入れ直さない。bin は同じコンピューターのボットで共有なので、別の版・`VERSION` なしでスクリプトがある・確かめ方が通らない、のどれかなら上書きする前に社長に確かめる。
      - 一時フォルダ（mktemp -d）で `curl -fsSL -o a.tgz https://github.com/keesmark/grok-bot-line-desk/archive/refs/tags/v0.1.0.tar.gz`、`tar -xzf a.tgz --strip-components=1`。
      - 取ってきたフォルダで「署名の確かめ方」を行い、`VERSION` がメモリの版と同じか確かめる。通らない・取れないときは止めて社長に伝える（自分で書かない、ほかから取らない）。
-     - `mkdir -p /workspace/line-inbox/bin` して scripts/*.py・VERSION・SHA256SUMS・SHA256SUMS.asc を写し、`chmod 700 /workspace/line-inbox/bin/*.py`。一時フォルダを消す。
-   - `DESK_DB=<保存先> python3 /workspace/line-inbox/bin/init_db.py` を実行し（やり直しても安全。フォルダも作る）、「ok, database ready」を確かめる。
+     - `mkdir -p /workspace/line-inbox/bin`、bin の `*.py` を消し（上書きを社長が OK したときだけ）、スクリプトは「署名の確かめ方」の最後の行のとおり一覧にあるものだけを写す。VERSION・SHA256SUMS・SHA256SUMS.asc も写し、`chmod 700 /workspace/line-inbox/bin/*.py`。一時フォルダを消す。
+   - `DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/init_db.py` を実行し（やり直しても安全。フォルダも作る）、「ok, database ready」を確かめる。
    - 受信のルーティン「LINE受信の記録」（Webhookトリガー）があるか見る。取り込みで作られないことがあるので、なければWebhookトリガーで作り、テンプレートの line-webhook ルーティンのプロンプトを、`<保存先>` をこのボットの保存先に置き換えて使う（log_event.py で記録、save_media.py で保存、keyword_reply.py で照合、知らせる。送るのはキーワード応答の自動送信がオンのときの登録の返事だけ。既読をつけない）。サイドバーのWebhook URLと送信キーは手順5で使う。したことを社長に伝える。
 1. フォーク（中継のしくみを自分のGitHubに写す）：https://github.com/keesmark/grok-bot-line-relay/fork で「Create fork」を押してもらう。公開でよい（秘密の値は入らない）。できたと聞けば完了。
 2. Cloudflareでデプロイ：「Workers & Pages」→「作成」（https://dash.cloudflare.com/?to=/:account/workers-and-pages/create ）→「リポジトリをインポート」。GitHubをつなぎ、フォークを選ぶ。
@@ -47,7 +47,7 @@ description: 最初の会話で使います。あいさつと商標の注記を�
    - △△：サイドバー「Webhook key」の送信キー。秘密なので社長がLINE Developersの欄で直接つなげる。できたURLはチャットに貼らないよう伝える。
    - URLの形は複数アカウントでも同じ。2つ目のアカウントも同じWorkerのURLで、`url=`・`token=` はそのアカウント用のボットの「LINE受信の記録」のもの。
 6. LINE Developersで、そのアカウントのチャネルの「Messaging API設定」を開き（別のチャネルに貼ると401）、Webhook URLに5のURLを貼り、「Webhookの利用」をONにして「検証」。成功か聞き、失敗なら「つまずいたとき」へ。
-7. 社長のスマホからLINE公式アカウントに1件送ってもらい、「LINE受信の記録」が記録したら完了（`DESK_DB=<保存先> python3 /workspace/line-inbox/bin/stats.py --days 1` で確かめる）。最初に届いたWebhookの宛先がこのボットのアカウントとして覚えられる（`account.py show` で末尾4文字）。
+7. 社長のスマホからLINE公式アカウントに1件送ってもらい、「LINE受信の記録」が記録したら完了（`DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/stats.py --days 1` で確かめる）。最初に届いたWebhookの宛先がこのボットのアカウントとして覚えられる（`account.py show` で末尾4文字）。
 8. 送信の接続（line-oa MCP）は、想像で話さず公式ページを示す。
    - https://developers.line.biz/ja/docs/messaging-api/getting-started/
    - https://developers.line.biz/ja/docs/basics/channel-access-token/
