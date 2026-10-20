@@ -11,11 +11,10 @@ while, so save it early. Never sends LINE messages.
 
 Exit: 0 saved or already saved, 1 error, 4 not ready yet, 5 external content
 
---json prints one JSON object on exit 0, 4 and 5:
+--json prints one JSON object on stdout for every exit:
   saved    {"saved": true, "already": false, "id", "path", "bytes", "content_type", "kind"}
-  already  {"saved": true, "already": true, "id", "path"}
-  4 / 5    {"saved": false, "id", "exit", "reason"}
-Errors (exit 1) go to stderr as text.
+  already  {"saved": true, "already": true, "id", "path", "bytes", "kind"}
+  1 / 4 / 5 {"saved": false, "id", "exit", "reason"} (exit 1 also prints the error to stderr)
 
 Env: LINE_CHANNEL_ACCESS_TOKEN  required, never printed
      DESK_DB                    required (this bot's own DB path; no default)
@@ -208,7 +207,8 @@ def save_media(mid, preview, force):
         if not line_id:
             raise Fail("message %d has no LINE message id" % mid)
         if old_path and os.path.isfile(old_path) and not force:
-            return {"saved": True, "already": True, "id": mid, "path": old_path}
+            return {"saved": True, "already": True, "id": mid, "path": old_path,
+                    "bytes": os.path.getsize(old_path), "kind": kind}
 
         message = message_of(raw)
         if is_external(message):
@@ -259,24 +259,27 @@ def main(argv):
     parser.add_argument("--json", action="store_true",
                         help="print the result as JSON")
     args = parser.parse_args(argv)
+
+    def not_saved(code, reason):
+        if args.json:
+            print(json.dumps({"saved": False, "id": args.message_id, "exit": code,
+                              "reason": reason}))
+        elif code != 1:
+            print(reason)
+        if code == 1:
+            print("error: %s" % reason, file=sys.stderr)
+        return code
+
     try:
         result = save_media(args.message_id, args.preview, args.force)
     except NotSaved as e:
-        if args.json:
-            print(json.dumps({"saved": False, "id": args.message_id, "exit": e.code,
-                              "reason": str(e)}))
-        else:
-            print(e)
-        return e.code
+        return not_saved(e.code, str(e))
     except Fail as e:
-        print("error: %s" % e, file=sys.stderr)
-        return 1
+        return not_saved(1, str(e))
     except sqlite3.Error as e:
-        print("error: database problem: %s" % e, file=sys.stderr)
-        return 1
+        return not_saved(1, "database problem: %s" % e)
     except OSError as e:
-        print("error: file problem: %s" % e, file=sys.stderr)
-        return 1
+        return not_saved(1, "file problem: %s" % e)
     if args.json:
         print(json.dumps(result))
     elif result["already"]:

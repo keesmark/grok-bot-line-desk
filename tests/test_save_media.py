@@ -51,10 +51,16 @@ class SaveMediaJsonTest(unittest.TestCase):
         con.close()
         return mid
 
+    def add_saved_image(self):
+        path = os.path.join(self.tmp.name, "old.jpg")
+        Path(path).write_bytes(b"x")
+        return self.add_image(media_path=path), path
+
     def run_main(self, *argv):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = save_media.main(list(argv))
+        self.err = err.getvalue()
         return code, out.getvalue()
 
     def test_saved_prints_json(self):
@@ -68,20 +74,57 @@ class SaveMediaJsonTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(result["path"]))
 
     def test_already_saved_prints_json(self):
-        path = os.path.join(self.tmp.name, "old.jpg")
-        Path(path).write_bytes(b"x")
-        mid = self.add_image(media_path=path)
+        mid, path = self.add_saved_image()
         code, out = self.run_main(str(mid), "--json")
         self.assertEqual(code, 0)
-        self.assertEqual(json.loads(out), {"saved": True, "already": True, "id": mid, "path": path})
+        self.assertEqual(json.loads(out), {"saved": True, "already": True, "id": mid, "path": path,
+                                           "bytes": 1, "kind": "content"})
 
     def test_already_saved_prints_text_without_json(self):
-        path = os.path.join(self.tmp.name, "old.jpg")
-        Path(path).write_bytes(b"x")
-        mid = self.add_image(media_path=path)
+        mid, path = self.add_saved_image()
         code, out = self.run_main(str(mid))
         self.assertEqual(code, 0)
         self.assertEqual(out, "already saved %s\n" % path)
+
+    def test_force_downloads_again(self):
+        mid, path = self.add_saved_image()
+        with mock.patch.object(save_media, "open_content", return_value=FakeResponse(b"new")):
+            code, out = self.run_main(str(mid), "--force", "--json")
+        self.assertEqual(code, 0)
+        result = json.loads(out)
+        self.assertFalse(result["already"])
+        self.assertNotEqual(result["path"], path)
+        self.assertEqual(result["bytes"], 3)
+
+    def test_preview_reports_kind(self):
+        mid = self.add_image()
+        with mock.patch.object(save_media, "open_content", return_value=FakeResponse(b"p")):
+            code, out = self.run_main(str(mid), "--preview", "--json")
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["kind"], "preview")
+        code, out = self.run_main(str(mid), "--preview", "--json")
+        self.assertEqual(json.loads(out)["kind"], "preview")
+        self.assertTrue(json.loads(out)["already"])
+
+    def test_error_prints_json_and_stderr(self):
+        code, out = self.run_main("999", "--json")
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(out), {"saved": False, "id": 999, "exit": 1,
+                                           "reason": "no message with id 999"})
+        self.assertIn("error: no message with id 999", self.err)
+
+    def test_error_without_json_prints_only_stderr(self):
+        code, out = self.run_main("999")
+        self.assertEqual(code, 1)
+        self.assertEqual(out, "")
+        self.assertIn("error: no message with id 999", self.err)
+
+    def test_missing_token_reason_does_not_hold_token(self):
+        mid = self.add_image()
+        with mock.patch.dict(os.environ, {"LINE_CHANNEL_ACCESS_TOKEN": ""}):
+            code, out = self.run_main(str(mid), "--json")
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(out)["reason"], "LINE_CHANNEL_ACCESS_TOKEN is not set")
 
     def test_external_content_prints_json_with_exit_5(self):
         mid = self.add_image(provider="external")

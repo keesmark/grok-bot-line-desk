@@ -43,8 +43,8 @@ match (run after log_event.py stored a 1:1 text message) prints
              below min_remaining (quota_low); the owner decides
   need_quota auto_send on, min_remaining > 0 and no --remaining: run
              quota_check.py --peek --json, then run match again with --remaining
-             (remaining null = no monthly limit: --remaining unlimited; the
-             check failed: --remaining unknown)
+             (remaining null = no monthly limit: --remaining unlimited or null;
+             the check failed: --remaining unknown)
   auto_send  decision auto_pending; push reply_text (--out writes it, 0600),
              then run sent
 need_quota / quota_unknown / quota_low only happen when min_remaining > 0; with
@@ -467,7 +467,11 @@ def cmd_setting(args):
 
 
 def _m_remaining(s):
-    """--remaining -> None (not given), "unlimited", "unknown" or an int >= 0."""
+    """--remaining -> None (not given), "unlimited", "unknown" or an int >= 0.
+
+    "null" is quota_check.py --json's remaining for an account with no monthly limit."""
+    if s == "null":
+        return "unlimited"
     if s is None or s in ("unlimited", "unknown"):
         return s
     try:
