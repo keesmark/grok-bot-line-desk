@@ -12,7 +12,8 @@ description: 「未返信は？」「問い合わせをまとめて」「急ぎ�
 ## 一覧の出し方
 1. `list_unreplied.py --json --include-groups` を実行する。DB がなければ `init_db.py` を実行してからやり直す。
 2. 1件ごとに、誰から（`label`）、用件を一言、待っている時間、元の文の冒頭の「」引用を書く。番号は付けない（返信や状態の変更は名前で言ってもらうため）。
-   - 表示名：`name_stale` が true の人だけ（同じ人は1回だけ）、その `user_id` で `get_profile` を1回呼び、名前を一時ファイルに書いて `profile_cache.py set <user_id> --name-file <ファイル>` で保存し、`profile_cache.py label <user_id>` で読み直した名前で出す（呼び名があれば呼び名のまま）。取得できなければ `label` のまま（「名前不明（ID末尾 xxxx）」。ID は末尾4文字だけ）。
+   - 表示名：`name_stale` が true の人だけ（同じ人は1回だけ）、その `user_id` で `get_profile` を1回呼び、名前を一時ファイルに書いて `profile_cache.py set <user_id> --name-file <ファイル>` で保存し、`profile_cache.py get <user_id> --json` で読み直した `label` で出す（呼び名があれば呼び名のまま）。取得できなければ `label` のまま（「名前不明（ID末尾 xxxx）」。ID は末尾4文字だけ）。
+   - `name_clash` が true の人には「（同じ名前の方がほかにもいます）」と添え、最後に呼び名を付けるよう1回だけ勧める（手順は desk-reply スキルの「呼び名」）。
    - 急ぎ（当日の変更、キャンセル、苦情など）は【急ぎ】と付ける。
    - 写真・動画・音声・ファイル：`save_media.py <その id> --json` を実行し（保存済みならそのまま）、「写真が届いています（保存済み）」などと書く。exit 4 は「（準備中）」、5・1 は「保存できませんでした。アプリで見てください」。
    - スタンプなど文字以外のものは「スタンプが届きました。アプリで見てください」と案内だけをする。

@@ -9,11 +9,15 @@ Usage: profile_cache.py get <userId> [--json] [--max-age-days N]
 
 get    prints the cached display name on one line, or "unknown".
        --json prints {"user_id", "display_name", "nickname", "profile_at",
-       "stale", "short_id", "label", "name_like_nickname"}.
+       "stale", "short_id", "label", "name_clash", "like_nickname"}.
 label  prints what the owner sees as the sender, on one line: the nickname,
        else the cached name (also when stale), else 名前不明（ID末尾 <short_id>）.
-       A cached name that reads the same as another person's nickname gets
-       （ID末尾 <short_id>） added. short_id is the last 4 characters of the
+       A cached name of someone without a nickname that clashes gets
+       （ID末尾 <short_id>） added (get --json: name_clash true): it reads the
+       same as another person's nickname or display name (ignoring width,
+       case, spaces, invisible marks, ID notes and a trailing 様/さま/さん/殿),
+       or it holds "ID末尾". like_nickname is true when it reads like another
+       person's nickname or holds "ID末尾": not the person with that nickname. short_id is the last 4 characters of the
        user id; the full id is never shown.
 set    saves the name (from a file, or from stdin with --name -) as
        customers.display_name and sets profile_at to now. nickname, note and
@@ -25,9 +29,9 @@ stale  lists user ids of inbound senders whose name is missing, empty or
 nickname  saves the owner's name for this person (customers.nickname), used
        instead of the display name in label, e.g. when two people share one
        display name. Refreshing the display name keeps it. It is cleaned like
-       a display name; one that is another person's nickname or display name
-       (compared ignoring width, case, spaces and invisible marks), or
-       that starts with 名前不明, is refused. --clear removes it. Prints "saved" or
+       a display name but never cut: over 100 characters is refused. One that
+       is another person's nickname or display name (compared as for
+       name_clash), starts with 名前不明 or holds ID末尾 is refused. --clear removes it. Prints "saved" or
        "cleared".
 
 A cached name counts as stale after 7 days by default. That is a proposal
@@ -141,8 +145,9 @@ def need(conn, db, table, columns):
                        % (table, col))
 
 
-def read_name(name_file):
-    """Read the name from name_file, or from stdin when name_file is None."""
+def read_name(name_file, whole=False):
+    """Read the name from name_file, or from stdin when name_file is None.
+    whole=True refuses a name over MAX_NAME_CHARS instead of cutting it."""
     if name_file is None:
         data = getattr(sys.stdin, "buffer", sys.stdin).read(MAX_INPUT_BYTES + 1)
     else:
@@ -159,7 +164,10 @@ def read_name(name_file):
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError:
         raise Fail("name is not valid UTF-8 text")
-    name = one_line(text).strip()[:MAX_NAME_CHARS].rstrip()
+    name = one_line(text).strip()
+    if whole and len(name) > MAX_NAME_CHARS:
+        raise Fail("name is over %d characters; nothing saved" % MAX_NAME_CHARS)
+    name = name[:MAX_NAME_CHARS].rstrip()
     if not name:
         raise Fail("name is empty; nothing saved")
     return name
@@ -184,26 +192,36 @@ def cached(conn, db, user_id):
     return clean(name), clean(nickname), profile_at
 
 
-def like_nickname(conn, user_id, name, nickname):
-    """True when this person has no nickname and their display name reads like
-    another person's nickname."""
-    if nickname or not name or not has_nickname(conn):
-        return False
-    want = same_name(name)
-    return any(same_name(clean(nick)) == want for (nick,) in conn.execute(
-        "SELECT nickname FROM customers WHERE user_id<>? AND nickname IS NOT NULL",
-        (user_id,)))
+def name_clash(conn, user_id, name, nickname):
+    """(name_clash, like_nickname) for a person without a nickname: their display
+    name reads like another person's display name or nickname, or holds an ID
+    note; like_nickname when it reads like a nickname or holds an ID note."""
+    if nickname or not name:
+        return False, False
+    if has_id_note(name):
+        return True, True
+    want = name_key(name)
+    if not want:
+        return False, False
+    nick = "nickname" if has_nickname(conn) else "NULL"
+    clash = like = False
+    for other, other_nick in conn.execute(
+            "SELECT display_name, %s FROM customers WHERE user_id<>?" % nick, (user_id,)):
+        like = like or want == name_key(clean(other_nick))
+        clash = clash or like or want == name_key(clean(other))
+    return clash, like
 
 
 def shown(conn, user_id, name, nickname):
-    """The label; a display name that reads like another person's nickname gets the ID tail."""
-    if like_nickname(conn, user_id, name, nickname):
+    """The label; a clashing display name gets the ID tail."""
+    if name_clash(conn, user_id, name, nickname)[0]:
         return "%s（ID末尾 %s）" % (name, short_id(user_id))
     return label(nickname or name, user_id)
 
 
 def get(conn, db, user_id, max_age_days, as_json):
     name, nickname, profile_at = cached(conn, db, user_id)
+    clash, like = name_clash(conn, user_id, name, nickname)
     if as_json:
         print(json.dumps({"user_id": user_id,
                           "display_name": name or None,
@@ -212,7 +230,8 @@ def get(conn, db, user_id, max_age_days, as_json):
                           "stale": is_stale(name, profile_at, max_age_days),
                           "short_id": short_id(user_id),
                           "label": shown(conn, user_id, name, nickname),
-                          "name_like_nickname": like_nickname(conn, user_id, name, nickname)},
+                          "name_clash": clash,
+                          "like_nickname": like},
                          ensure_ascii=False))
     else:
         print(name or "unknown")
@@ -235,17 +254,34 @@ def same_name(text):
                    and unicodedata.category(c) not in ("Cf", "Mn", "Me"))
 
 
+# A note like （ID末尾 1a2b） or a trailing 様/さま/さん/殿 does not make a name different.
+ID_NOTE_RE = re.compile(r"\(?id末尾[^)]*\)?")
+HONORIFIC_RE = re.compile(r"(?:様|さま|さん|殿)+$")
+
+
+def name_key(text):
+    """same_name without ID notes and trailing honorifics."""
+    return HONORIFIC_RE.sub("", ID_NOTE_RE.sub("", same_name(text)))
+
+
+def has_id_note(text):
+    return "id末尾" in same_name(text)
+
+
 def set_nickname(conn, db, user_id, nickname):
     need(conn, db, "customers", ("display_name", "nickname"))
     with conn:
         if nickname:
-            want = same_name(nickname)
-            if want.startswith(same_name(UNKNOWN_LABEL)):
-                raise Fail("a nickname cannot start with %s; choose another" % UNKNOWN_LABEL)
+            if same_name(nickname).startswith(same_name(UNKNOWN_LABEL)) or has_id_note(nickname):
+                raise Fail("a nickname cannot start with %s or hold ID末尾; choose another"
+                           % UNKNOWN_LABEL)
+            want = name_key(nickname)
+            if not want:
+                raise Fail("nickname is only spaces, marks or an honorific; choose another")
             for uid, name, nick in conn.execute(
                     "SELECT user_id, display_name, nickname FROM customers"
                     " WHERE user_id<>?", (user_id,)):
-                if want in (same_name(clean(nick)), same_name(clean(name))):
+                if want in (name_key(clean(nick)), name_key(clean(name))):
                     raise Fail("nickname already used for another person (ID末尾 %s);"
                                " choose another" % short_id(uid))
         conn.execute("INSERT OR IGNORE INTO customers(user_id) VALUES(?)",
@@ -286,8 +322,10 @@ def run(args, db):
     if args.cmd in ("get", "label", "set", "nickname"):
         check_user_id(args.user_id)
     name = None
-    if args.cmd == "set" or (args.cmd == "nickname" and not args.clear):
+    if args.cmd == "set":
         name = read_name(args.name_file)
+    elif args.cmd == "nickname" and not args.clear:
+        name = read_name(args.name_file, whole=True)
     conn = open_db(db)
     try:
         if args.cmd == "get":
@@ -315,7 +353,7 @@ def main(argv):
     p.add_argument("user_id", help="LINE user id")
     p.add_argument("--json", action="store_true",
                    help="print user_id, display_name, nickname, profile_at, stale,"
-                   " short_id, label as JSON")
+                   " short_id, label, name_clash, like_nickname as JSON")
     p.add_argument("--max-age-days", type=max_age, default=MAX_AGE_DAYS,
                    metavar="N", help=age_help)
 

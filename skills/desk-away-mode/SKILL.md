@@ -22,7 +22,7 @@ description: 担当者が「不在にする」「出かける」「戻った」�
 
 ## 戻ったとき
 1. away を false にする。
-2. `DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/list_unreplied.py --include-groups --json` で一覧を出す。【急ぎ】を先にし、そのあとは待ち時間の長い順に並べる。番号は付けない（返信は名前で言ってもらうため）。1件ごとに、誰から（`label`。`name_stale` の人は desk-inquiry-summary と同じ方法で名前を取得する）、用件、待っている時間、元の文の冒頭の「」引用を書く。
+2. `DESK_DB=<保存先> python3 -I /workspace/line-inbox/bin/list_unreplied.py --include-groups --json` で一覧を出す。【急ぎ】を先にし、そのあとは待ち時間の長い順に並べる。番号は付けない（返信は名前で言ってもらうため）。1件ごとに、誰から（`label`。`name_stale` の人は desk-inquiry-summary と同じ方法で名前を取得する）、用件、待っている時間、元の文の冒頭の「」引用を書く。`name_clash` の人には、desk-inquiry-summary と同じ注記を付ける。
 3. グループ・複数人トークは要約だけにし、返信案は作らない。
 4. 「ボットが把握している範囲です」と添える。返信は「〇〇さんに返信して」と言ってもらい、desk-reply スキルで行う。
 - 一覧を出しただけでは既読をつけない。

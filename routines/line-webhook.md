@@ -22,7 +22,8 @@
   - auto_send：JSON の user_id に送り、py keyword_reply.py sent <id> --result sent|unknown|failed [--line-message-id …] で記録する（結果不明は unknown、エラーは failed --error="<要旨>"。送り直さない）。続けて py quota_check.py --json を実行する。誰に（7と同じ名前）・全文・結果を通知する（不在モード中でも通知する。notice_due なら残り通数も。エラーなら「送れませんでした」と理由と文面の冒頭）。
 6. 不在モード中（DB と同じフォルダの away.json で away が true）は1件ずつ通知しない。last_bundle_at から interval_minutes が過ぎていたら、py list_unreplied.py --include-groups --json で last_bundle_at 以降の分をまとめて通知し（形式は7と同じ）、last_bundle_at を現在時刻にする。まだ過ぎていない、または null なら通知しない（一覧は、担当者が戻ったときか「未返信は？」と聞かれたときに出す）。
 7. 通常は1件ごとに短く通知する。
-  - 冒頭は「〇〇さんから」。名前は手順1の行の user_id で py profile_cache.py get <user_id> --json の label を使う（まとめて通知するときは list_unreplied.py の label）。名前がないか stale なら get_profile を1回呼び、名前を一時ファイルに書いて py profile_cache.py set <user_id> --name-file <一時ファイル> で保存し、一時ファイルを消して、py profile_cache.py label <user_id> で読み直した名前を使う（呼び名があれば呼び名）。取得できなければ label のまま（名前不明（ID末尾 xxxx））。
+  - 冒頭は「〇〇さんから」。名前は手順1の行の user_id で py profile_cache.py get <user_id> --json の label を使う（まとめて通知するときは list_unreplied.py の label）。名前がないか stale なら get_profile を1回呼び、名前を一時ファイルに書いて py profile_cache.py set <user_id> --name-file <一時ファイル> で保存し、一時ファイルを消して、py profile_cache.py get <user_id> --json で読み直した label を使う（呼び名があれば呼び名）。取得できなければ label のまま（名前不明（ID末尾 xxxx））。
+  - name_clash が true なら（list_unreplied.py の行にもある）、「同じ名前の方がほかにもいます。区別のため、『この方の呼び名を〇〇にして』と言って呼び名を付けてください」と添える。
   - 用件を一言で書く。当日の変更・キャンセル・苦情などは冒頭に【急ぎ】と付ける（目印だけ）。元の文の冒頭を「」で引用する。
   - 画像などは手順4の結果で書く（まとめて通知するときは save_media.py --json を再実行）：0 は「写真が届いています（保存済み）」、4 は「（準備中です。見たいときは『見せて』と言ってください）」、5・1 はメモリの「決まり」の文。
   - スタンプなどは種類と「アプリで見てください」だけを書く。友だち追加などは、誰かを添えて一言で書く。

@@ -26,7 +26,7 @@ MEMBER = "U" + "0" * 28 + "c3d4"
 GROUP = "C" + "0" * 28 + "9f3e"
 NAME = "田中 花子"
 FALLBACK = "名前不明（ID末尾 a1b2）"
-PROFILE_KEYS = {"user_id", "display_name", "nickname", "profile_at", "stale", "short_id", "label", "name_like_nickname"}
+PROFILE_KEYS = {"user_id", "display_name", "nickname", "profile_at", "stale", "short_id", "label", "name_clash", "like_nickname"}
 _mods, _ids = {}, itertools.count(1)
 
 
@@ -404,20 +404,20 @@ class DisplayNameTest(unittest.TestCase):
     def test_nickname_is_the_label_and_survives_a_name_refresh(self):
         self.inbound(USER, "予約できますか")
         self.set_name(USER, NAME)
-        code, out, err = self.nick(USER, "--name", "-", stdin=" 田中さん（美容室）\n")
+        code, out, err = self.nick(USER, "--name", "-", stdin=" 田中（美容室）\n")
         self.assertEqual((code, out.strip()), (0, "saved"), err)
         p = self.profile(USER)
-        self.assertEqual(p["nickname"], "田中さん（美容室）")
+        self.assertEqual(p["nickname"], "田中（美容室）")
         self.assertEqual(p["display_name"], NAME)
-        self.assertEqual(p["label"], "田中さん（美容室）")
-        self.assertEqual(self.label(USER), "田中さん（美容室）")
+        self.assertEqual(p["label"], "田中（美容室）")
+        self.assertEqual(self.label(USER), "田中（美容室）")
         self.assertEqual(self.pc("get", USER)[1].strip(), NAME)
         self.set_name(USER, "はなこ")
         p = self.profile(USER)
-        self.assertEqual((p["display_name"], p["nickname"]), ("はなこ", "田中さん（美容室）"))
+        self.assertEqual((p["display_name"], p["nickname"]), ("はなこ", "田中（美容室）"))
         c = self.chat()
-        self.assertEqual((c["label"], c["name"], c["nickname"]), ("田中さん（美容室）", "はなこ", "田中さん（美容室）"))
-        self.assertIn('who="田中さん（美容室）"', self.plain())
+        self.assertEqual((c["label"], c["name"], c["nickname"]), ("田中（美容室）", "はなこ", "田中（美容室）"))
+        self.assertIn('who="田中（美容室）"', self.plain())
 
     def test_nickname_from_file_and_clear(self):
         path = os.path.join(self.dir, "nick.txt")
@@ -472,7 +472,7 @@ class DisplayNameTest(unittest.TestCase):
         self.assertEqual(self.profile(OTHER)["display_name"], "田中（美容室）")
         self.assertIn('who="田中（美容室）（ID末尾 e5f6）"', self.plain())
 
-    def test_lookalike_of_an_unlisted_nickname_is_flagged(self):
+    def test_lookalike_of_an_unlisted_nickname_clashes(self):
         self.set_name(USER, NAME)
         self.assertEqual(self.nick(USER, "--name", "-", stdin="田中（美容室）")[0], 0)
         self.inbound(OTHER, "明日の件ですが")
@@ -480,14 +480,83 @@ class DisplayNameTest(unittest.TestCase):
             self.set_name(OTHER, fake)
             c = self.chat()
             self.assertEqual(c["user_id"], OTHER)
-            self.assertIs(c["name_like_nickname"], True, fake)
+            self.assertIs(c["name_clash"], True, fake)
             self.assertTrue(c["label"].endswith("（ID末尾 e5f6）"), c["label"])
             p = self.profile(OTHER)
-            self.assertIs(p["name_like_nickname"], True)
+            self.assertIs(p["name_clash"], True)
             self.assertTrue(p["label"].endswith("（ID末尾 e5f6）"), p["label"])
-        self.assertIs(self.profile(USER)["name_like_nickname"], False)
+        self.assertIs(self.profile(USER)["name_clash"], False)
         self.set_name(OTHER, "鈴木")
-        self.assertIs(self.chat()["name_like_nickname"], False)
+        self.assertIs(self.chat()["name_clash"], False)
+
+    def test_same_display_names_clash_until_nicknamed(self):
+        self.inbound(USER, "予約できますか")
+        self.inbound(OTHER, "明日の件ですが")
+        self.set_name(USER, NAME)
+        self.set_name(OTHER, "田中花子さま")
+        found = {c["user_id"]: c for c in self.chats()}
+        self.assertEqual(found[USER]["label"], NAME + "（ID末尾 a1b2）")
+        self.assertEqual(found[OTHER]["label"], "田中花子さま（ID末尾 e5f6）")
+        self.assertTrue(found[USER]["name_clash"] and found[OTHER]["name_clash"])
+        self.assertIs(self.profile(OTHER)["name_clash"], True)
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="田中（美容室）")[0], 0)
+        found = {c["user_id"]: c for c in self.chats()}
+        self.assertEqual((found[USER]["label"], found[USER]["name_clash"]), ("田中（美容室）", False))
+        self.assertIs(found[OTHER]["name_clash"], True)
+        self.assertEqual(self.nick(OTHER, "--name", "-", stdin="田中（工務店）")[0], 0)
+        found = {c["user_id"]: c for c in self.chats()}
+        self.assertEqual(found[OTHER]["label"], "田中（工務店）")
+        self.assertIs(found[OTHER]["name_clash"], False)
+
+    def test_name_with_honorific_or_id_note_clashes(self):
+        self.set_name(USER, NAME)
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="田中（美容室）")[0], 0)
+        self.inbound(OTHER, "明日の件ですが")
+        for fake in ("田中（美容室）様", "田中(美容室)さん", "田中（美容室）（ID末尾 a1b2）", "鈴木（ID末尾 0000）"):
+            self.set_name(OTHER, fake)
+            c = self.chat()
+            self.assertIs(c["name_clash"], True, fake)
+            self.assertTrue(c["label"].endswith("（ID末尾 e5f6）"), c["label"])
+            self.assertIs(self.profile(OTHER)["name_clash"], True, fake)
+            self.assertIs(c["like_nickname"], True, fake)
+        self.set_name(OTHER, "田中（美容室）スタッフ")
+        self.assertIs(self.chat()["name_clash"], False)
+        self.set_name(OTHER, NAME + "さん")
+        c, p = self.chat(), self.profile(OTHER)
+        self.assertEqual((c["name_clash"], c["like_nickname"]), (True, False))
+        self.assertEqual((p["name_clash"], p["like_nickname"]), (True, False))
+
+    def test_clash_on_an_old_db_and_scripts_agree(self):
+        names = {USER: NAME, OTHER: "田中花子様", MEMBER: "佐藤"}
+        for uid, name in names.items():
+            self.inbound(uid, "こんにちは")
+            self.set_name(uid, name)
+        self.execute("ALTER TABLE customers DROP COLUMN nickname")
+        found = {c["user_id"]: c for c in self.chats()}
+        for uid in names:
+            p = self.profile(uid)
+            self.assertEqual((found[uid]["label"], found[uid]["name_clash"], found[uid]["like_nickname"]),
+                             (p["label"], p["name_clash"], p["like_nickname"]))
+        self.assertEqual(found[OTHER]["label"], "田中花子様（ID末尾 e5f6）")
+        self.assertEqual(found[MEMBER]["label"], "佐藤")
+
+    def test_nickname_rules_for_length_honorific_and_id_note(self):
+        self.set_name(OTHER, "鈴木")
+        code, out, err = self.nick(USER, "--name", "-", stdin="あ" * 101)
+        self.assertEqual(code, 1)
+        self.assertIn("over 100 characters", err)
+        self.assertIsNone(self.profile(USER)["nickname"])
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="あ" * 100)[0], 0)
+        self.assertEqual(self.profile(USER)["nickname"], "あ" * 100)
+        code, out, err = self.nick(USER, "--name", "-", stdin="鈴木様")
+        self.assertEqual(code, 1)
+        self.assertIn("ID末尾 e5f6", err)
+        code, out, err = self.nick(USER, "--name", "-", stdin="さん")
+        self.assertEqual(code, 1)
+        self.assertIn("only spaces", err)
+        code, out, err = self.nick(USER, "--name", "-", stdin="田中（ID末尾 1234）")
+        self.assertEqual(code, 1)
+        self.assertIn("ID末尾; choose", err)
 
     def test_unreplied_name_is_cleaned(self):
         self.inbound(USER, "こんにちは")
