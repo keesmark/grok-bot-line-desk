@@ -23,6 +23,7 @@ of the reply text, the decision (suggested / auto_pending / auto_sent /
 auto_unknown / auto_failed), the reason and the logged outbound row.
 messages.destination is the LINE account an inbound webhook was for (NULL on
 outbound and older rows); status 'other_account' = not this bot's account.
+customers.nickname is the owner's name for a friend (profile_cache.py nickname).
 desk_settings holds shop settings; account_destination (this bot's account)
 is learned from the first webhook; account.py shows, changes or forgets it.
 """
@@ -52,7 +53,7 @@ TABLES = {
  memo TEXT, updated_at TEXT)""",
     "customers": """CREATE TABLE IF NOT EXISTS customers(
  user_id TEXT PRIMARY KEY, display_name TEXT, note TEXT, evidence TEXT, updated_at TEXT,
- profile_at TEXT)""",
+ profile_at TEXT, nickname TEXT)""",
     "canned_replies": """CREATE TABLE IF NOT EXISTS canned_replies(
  name TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT)""",
     # Per-friend tags, one row per (user_id, tag); kept only here, not on LINE.

@@ -27,11 +27,14 @@ Fields:
   read           whether the latest inbound message was marked read
   name, memo     sender's customers.display_name and the chat memo
                  (plain output shows them only when set)
+  nickname       the owner's name for the sender (profile_cache.py nickname), or ""
   user_id        sender of the latest inbound message ("" if none); in a
                  group/room chat the member who wrote it
   short_id       last 4 characters of user_id (never show the full id)
   label          what the owner sees as the sender (plain output: who=): the
-                 cached name, else 名前不明（ID末尾 <short_id>）, else 名前不明
+                 nickname, else the cached name, else 名前不明（ID末尾 <short_id>）,
+                 else 名前不明; a cached name that reads the same as another
+                 person's nickname gets （ID末尾 <short_id>） added
   name_stale     true when that name is missing or older than 7 days: fetch it
                  with get_profile and save it with profile_cache.py set
   text           first 60 chars of the latest text, newlines collapsed
@@ -139,10 +142,17 @@ def quote(text):
     return json.dumps(" ".join(text.split()), ensure_ascii=False)
 
 
+# Invisible marks that can make one name look like another (bidi controls,
+# zero-width space, word joiner, BOM); zero-width (non-)joiners stay for emoji.
+HIDDEN = frozenset("\u061c\u200b\u200e\u200f\u202a\u202b\u202c\u202d\u202e"
+                   "\u2060\u2066\u2067\u2068\u2069\ufeff")
+
+
 def one_line(text):
-    """Control characters and line breaks become spaces (as in profile_cache.py)."""
+    """Control characters and line breaks become spaces; hidden marks are dropped
+    (as in profile_cache.py)."""
     return "".join(" " if unicodedata.category(c) in ("Cc", "Zl", "Zp") else c
-                   for c in str(text))
+                   for c in str(text) if c not in HIDDEN)
 
 
 def short_id(user_id):
@@ -168,6 +178,21 @@ def is_stale(name, profile_at, now):
     except (TypeError, ValueError, OverflowError, OSError):
         return True
     return now - fetched > timedelta(days=MAX_AGE_DAYS)
+
+
+def same_name(text):
+    """Compare names ignoring width, case, spaces and invisible format characters."""
+    text = unicodedata.normalize("NFKC", text).casefold()
+    return "".join(c for c in text if not c.isspace() and unicodedata.category(c) != "Cc"
+                   and unicodedata.category(c) != "Cf")
+
+
+def nicknames(con):
+    """{user_id: customers.nickname}; empty on DBs without that column."""
+    columns = {r[1] for r in con.execute("PRAGMA table_info(customers)")}
+    if "nickname" not in columns:
+        return {}
+    return {r[0]: r[1] for r in con.execute("SELECT user_id, nickname FROM customers")}
 
 
 def profile_times(con):
@@ -209,6 +234,11 @@ def unreplied(con, include_groups):
     convs = {r["chat_key"]: r for r in con.execute("SELECT chat_key, state, memo FROM conversations")}
     names = {r[0]: r[1] for r in con.execute("SELECT user_id, display_name FROM customers")}
     profiles = profile_times(con)
+    nicks = nicknames(con)
+    taken = {}
+    for uid, nick in nicks.items():
+        if nick and one_line(nick).strip():
+            taken.setdefault(same_name(one_line(nick).strip()), set()).add(uid)
     waiting = find_waiting(con)
     chats, hidden = [], 0
     for w in sorted(waiting.values(), key=lambda w: (w["first"]["at"], w["first"]["id"])):
@@ -224,6 +254,7 @@ def unreplied(con, include_groups):
         minutes = minutes_since(first["at"], now)
         uid = last["user_id"] or ""  # sender of the latest inbound message
         name = one_line(names.get(uid) or "").strip() if uid else ""
+        nickname = one_line(nicks.get(uid) or "").strip() if uid else ""
         chats.append({
             "n": len(chats) + 1,
             "chat_key": w["key"],
@@ -238,9 +269,12 @@ def unreplied(con, include_groups):
             "count": w["count"],
             "read": last["read_at"] is not None,
             "name": names.get(last["user_id"]) or "",
+            "nickname": nickname,
             "user_id": uid,
             "short_id": short_id(uid),
-            "label": label(name, uid),
+            "label": (f"{name}（ID末尾 {short_id(uid)}）"
+                      if not nickname and name and taken.get(same_name(name), set()) - {uid}
+                      else label(nickname or name, uid)),
             "name_stale": is_stale(name, profiles.get(uid) if uid else None, now),
             "memo": (conv["memo"] if conv else None) or "",
             "text": preview(last["text"]),

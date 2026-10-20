@@ -26,7 +26,7 @@ MEMBER = "U" + "0" * 28 + "c3d4"
 GROUP = "C" + "0" * 28 + "9f3e"
 NAME = "田中 花子"
 FALLBACK = "名前不明（ID末尾 a1b2）"
-PROFILE_KEYS = {"user_id", "display_name", "profile_at", "stale", "short_id", "label"}
+PROFILE_KEYS = {"user_id", "display_name", "nickname", "profile_at", "stale", "short_id", "label"}
 _mods, _ids = {}, itertools.count(1)
 
 
@@ -397,6 +397,76 @@ class DisplayNameTest(unittest.TestCase):
         self.assertIs(found[USER]["name_stale"], False)
         self.assertEqual(found[OTHER]["label"], "名前不明（ID末尾 e5f6）")
 
+
+    def nick(self, user, *args, stdin=""):
+        return self.pc("nickname", user, *args, stdin=stdin)
+
+    def test_nickname_is_the_label_and_survives_a_name_refresh(self):
+        self.inbound(USER, "予約できますか")
+        self.set_name(USER, NAME)
+        code, out, err = self.nick(USER, "--name", "-", stdin=" 田中さん（美容室）\n")
+        self.assertEqual((code, out.strip()), (0, "saved"), err)
+        p = self.profile(USER)
+        self.assertEqual(p["nickname"], "田中さん（美容室）")
+        self.assertEqual(p["display_name"], NAME)
+        self.assertEqual(p["label"], "田中さん（美容室）")
+        self.assertEqual(self.label(USER), "田中さん（美容室）")
+        self.assertEqual(self.pc("get", USER)[1].strip(), NAME)
+        self.set_name(USER, "はなこ")
+        p = self.profile(USER)
+        self.assertEqual((p["display_name"], p["nickname"]), ("はなこ", "田中さん（美容室）"))
+        c = self.chat()
+        self.assertEqual((c["label"], c["name"], c["nickname"]), ("田中さん（美容室）", "はなこ", "田中さん（美容室）"))
+        self.assertIn('who="田中さん（美容室）"', self.plain())
+
+    def test_nickname_from_file_and_clear(self):
+        path = os.path.join(self.dir, "nick.txt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("田中A")
+        code, out, err = self.nick(USER, "--name-file", path)
+        self.assertEqual((code, out.strip()), (0, "saved"), err)
+        self.assertEqual(self.label(USER), "田中A")
+        self.assertIsNone(self.profile(USER)["display_name"])
+        code, out, err = self.nick(USER, "--clear")
+        self.assertEqual((code, out.strip()), (0, "cleared"), err)
+        self.assertIsNone(self.profile(USER)["nickname"])
+        self.assertEqual(self.label(USER), FALLBACK)
+        code, out, err = self.nick(USER, "--name", "-", stdin=" \n")
+        self.assertEqual(code, 1)
+        self.assertIn("name is empty", err)
+
+    def test_nickname_shown_for_another_person_is_refused(self):
+        self.set_name(USER, NAME)
+        self.set_name(OTHER, "鈴木")
+        code, out, err = self.nick(OTHER, "--name", "-", stdin="田中　花子")
+        self.assertEqual(code, 1)
+        self.assertIn("ID末尾 a1b2", err)
+        self.assertNotIn(USER, err)
+        self.assertIsNone(self.profile(OTHER)["nickname"])
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="TANAKA")[0], 0)
+        self.assertEqual(self.nick(OTHER, "--name", "-", stdin=NAME)[0], 0)
+        code, out, err = self.nick(OTHER, "--name", "-", stdin="ｔａｎａｋａ")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.label(OTHER), NAME)
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="tanaka")[0], 0)
+        self.assertEqual(self.nick(MEMBER, "--name", "-", stdin="鈴木")[0], 0)
+
+    def test_nickname_needs_init_db_on_an_old_db(self):
+        self.set_name(USER, NAME)
+        self.execute("ALTER TABLE customers DROP COLUMN nickname")
+        p = self.profile(USER)
+        self.assertIsNone(p["nickname"])
+        self.assertEqual(p["label"], NAME)
+        self.inbound(USER, "こんにちは")
+        self.assertEqual(self.chat()["nickname"], "")
+        code, out, err = self.nick(USER, "--name", "-", stdin="田中A")
+        self.assertEqual(code, 1)
+        self.assertIn("customers.nickname is missing", err)
+        code, out, err = self.run_script("init_db")
+        self.assertEqual(code, 0, err)
+        self.assertIn("table customers: added column nickname", out)
+        self.assertEqual(self.nick(USER, "--name", "-", stdin="田中A")[0], 0)
+        self.assertEqual(self.label(USER), "田中A")
 
 def main():
     before = real_db_stat()
