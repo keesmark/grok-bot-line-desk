@@ -11,6 +11,12 @@ while, so save it early. Never sends LINE messages.
 
 Exit: 0 saved or already saved, 1 error, 4 not ready yet, 5 external content
 
+--json prints one JSON object on exit 0, 4 and 5:
+  saved    {"saved": true, "already": false, "id", "path", "bytes", "content_type", "kind"}
+  already  {"saved": true, "already": true, "id", "path"}
+  4 / 5    {"saved": false, "id", "exit", "reason"}
+Errors (exit 1) go to stderr as text.
+
 Env: LINE_CHANNEL_ACCESS_TOKEN  required, never printed
      DESK_DB                    required (this bot's own DB path; no default)
 """
@@ -202,7 +208,7 @@ def save_media(mid, preview, force):
         if not line_id:
             raise Fail("message %d has no LINE message id" % mid)
         if old_path and os.path.isfile(old_path) and not force:
-            return {"already": old_path}
+            return {"saved": True, "already": True, "id": mid, "path": old_path}
 
         message = message_of(raw)
         if is_external(message):
@@ -234,7 +240,7 @@ def save_media(mid, preview, force):
             conn.execute("UPDATE messages SET " + column
                          + "=?, media_saved_at=? WHERE id=?",
                          (path, now_iso(), mid))
-        return {"id": mid, "path": path, "bytes": size,
+        return {"saved": True, "already": False, "id": mid, "path": path, "bytes": size,
                 "content_type": content_type or "unknown", "kind": kind}
     finally:
         conn.close()
@@ -256,7 +262,11 @@ def main(argv):
     try:
         result = save_media(args.message_id, args.preview, args.force)
     except NotSaved as e:
-        print(e)
+        if args.json:
+            print(json.dumps({"saved": False, "id": args.message_id, "exit": e.code,
+                              "reason": str(e)}))
+        else:
+            print(e)
         return e.code
     except Fail as e:
         print("error: %s" % e, file=sys.stderr)
@@ -267,10 +277,10 @@ def main(argv):
     except OSError as e:
         print("error: file problem: %s" % e, file=sys.stderr)
         return 1
-    if "already" in result:
-        print("already saved %s" % result["already"])
-    elif args.json:
+    if args.json:
         print(json.dumps(result))
+    elif result["already"]:
+        print("already saved %s" % result["path"])
     else:
         print("saved %s (%d bytes, %s)"
               % (result["path"], result["bytes"], result["content_type"]))

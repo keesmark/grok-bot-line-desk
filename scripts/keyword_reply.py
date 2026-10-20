@@ -43,6 +43,8 @@ match (run after log_event.py stored a 1:1 text message) prints
              below min_remaining (quota_low); the owner decides
   need_quota auto_send on, min_remaining > 0 and no --remaining: run
              quota_check.py --peek --json, then run match again with --remaining
+             (remaining null = no monthly limit: --remaining unlimited; the
+             check failed: --remaining unknown)
   auto_send  decision auto_pending; push reply_text (--out writes it, 0600),
              then run sent
 need_quota / quota_unknown / quota_low only happen when min_remaining > 0; with

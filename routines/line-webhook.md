@@ -17,7 +17,7 @@ Webhookを記録し、社長に知らせる。決まりはメモリの「決ま�
 3. no events か duplicate（送り直し）だけなら知らせずに終わる。account=other の行は記録だけ（4〜7をしない）。本文は出さず1回「別のアカウント宛て（末尾 <dest>）が届きました。別のアカウントのWebhookがつながっているかもしれません。中継の設定とLINE側のWebhook URLを確認してください」。account=learned は「アカウント（末尾 <dest>）を覚えました」と添える。
 4. 新しい画像・動画・音声・ファイルは早めに py save_media.py <messages の id> --json（やり直さない）。
 5. 新しい1対1のテキストは py keyword_reply.py match <id> --json。
-  - need_quota（社長が残り通数で止める設定にしたときだけ）: py quota_check.py --peek --json の remainingで --remaining を付け再び。
+  - need_quota（社長が残り通数で止める設定にしたときだけ）: py quota_check.py --peek --json の remaining を --remaining に付け再び（remaining が null＝上限なしなら --remaining unlimited、読めなければ --remaining unknown）。
   - suggest：お知らせに「キーワード『<keyword>』の登録の返事があります（送るなら一覧から『送信 N』）」と添える。none・already：何もしない。
   - auto_send: JSON の user_id に送り、py keyword_reply.py sent <id> --result sent|unknown|failed [--line-message-id …]（不明は unknown。エラーは failed --error="<要旨>"。送り直さない）、py quota_check.py --json。誰に（7と同じ名前）・全文・結果を知らせる（不在でも。notice_due なら通数も。エラーは「送れませんでした」と理由・文の先頭）。
 6. 不在モード（DBと同じフォルダの away.json の away が true）中は1件ずつ知らせない。last_bundle_at から interval_minutes 過ぎたら py list_unreplied.py --include-groups --json で last_bundle_at 以降の分をまとめて知らせ（形は7）、last_bundle_at を今に。まだ・null なら知らせない（一覧は戻ったときか「未返信は？」で）。
