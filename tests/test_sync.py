@@ -19,13 +19,15 @@ FILES = {
     "scripts/b.py": "print('b')\n",
     "scripts/a.py": "print('a')\n",
     "skills/desk-getting-started/SKILL.md":
-        "版：Desk for LINE v0.1.0\ncurl https://github.com/x/y/archive/refs/tags/v0.1.0.tar.gz\n",
-    "skills/desk-reply/SKILL.md": "# reply\n\n版：Desk for LINE v0.1.0\n",
-    "routines/line-webhook.md": "- 版：Desk for LINE v0.1.0。\n",
+        "バージョン：Desk for LINE v0.1.0\ncurl https://github.com/x/y/archive/refs/tags/v0.1.0.tar.gz\n",
+    "skills/desk-reply/SKILL.md": "# reply\n\nバージョン：Desk for LINE v0.1.0\n",
+    "routines/line-webhook.md": "- バージョン：Desk for LINE v0.1.0。\n",
     "README.md": "curl -o a.tgz https://github.com/x/y/archive/refs/tags/v0.1.0.tar.gz\n",
     "README.en.md": "curl -o a.tgz https://github.com/x/y/archive/refs/tags/v0.1.0.tar.gz\n",
     "CHANGELOG.md": "# changes\n\n## v0.2.0（2026-11-01）\n\n## v0.1.0（2026-10-20）\n",
     "MIGRATIONS.md": "# migrations\n\n## v0.2.0\nなし\n",
+    "template/profile.md": "# profile\n\nバージョン：Desk for LINE v0.1.0\n",
+    "template/memory.md": "- Desk for LINE のバージョン：v0.1.0（VERSION の値は 0.1.0。取得元）\n",
 }
 
 
@@ -56,17 +58,21 @@ class SyncTest(unittest.TestCase):
 
     def expected_sums(self):
         names = ["CHANGELOG.md", "MIGRATIONS.md", "VERSION", "routines/line-webhook.md", "scripts/a.py",
-                 "scripts/b.py", "skills/desk-getting-started/SKILL.md", "skills/desk-reply/SKILL.md"]
+                 "scripts/b.py", "skills/desk-getting-started/SKILL.md", "skills/desk-reply/SKILL.md",
+                 "template/memory.md", "template/profile.md"]
         return "".join("%s  %s\n" % (digest(self.text(name)), name) for name in names)
 
     def test_writes_sums_labels_and_tags(self):
         code, out, err = self.run_sync()
         self.assertEqual(code, 0, err)
         self.assertEqual(self.text("SHA256SUMS"), self.expected_sums())
-        self.assertEqual(self.text("skills/desk-reply/SKILL.md"), "# reply\n\n版：Desk for LINE v0.2.0\n")
-        self.assertEqual(self.text("routines/line-webhook.md"), "- 版：Desk for LINE v0.2.0。\n")
+        self.assertEqual(self.text("skills/desk-reply/SKILL.md"), "# reply\n\nバージョン：Desk for LINE v0.2.0\n")
+        self.assertEqual(self.text("routines/line-webhook.md"), "- バージョン：Desk for LINE v0.2.0。\n")
         self.assertEqual(self.text("skills/desk-getting-started/SKILL.md"),
-                         "版：Desk for LINE v0.2.0\ncurl https://github.com/x/y/archive/refs/tags/v0.2.0.tar.gz\n")
+                         "バージョン：Desk for LINE v0.2.0\ncurl https://github.com/x/y/archive/refs/tags/v0.2.0.tar.gz\n")
+        self.assertEqual(self.text("template/profile.md"), "# profile\n\nバージョン：Desk for LINE v0.2.0\n")
+        self.assertEqual(self.text("template/memory.md"),
+                         "- Desk for LINE のバージョン：v0.2.0（VERSION の値は 0.2.0。取得元）\n")
         self.assertIn("/archive/refs/tags/v0.2.0.tar.gz", self.text("README.md"))
         self.assertIn("/archive/refs/tags/v0.2.0.tar.gz", self.text("README.en.md"))
         self.assertIn("updated SHA256SUMS", out)
@@ -95,7 +101,7 @@ class SyncTest(unittest.TestCase):
 
     def test_sums_cover_rewritten_skills(self):
         self.run_sync()
-        self.assertIn("%s  skills/desk-reply/SKILL.md\n" % digest("# reply\n\n版：Desk for LINE v0.2.0\n"),
+        self.assertIn("%s  skills/desk-reply/SKILL.md\n" % digest("# reply\n\nバージョン：Desk for LINE v0.2.0\n"),
                       self.text("SHA256SUMS"))
 
     def test_check_detects_changed_script(self):
@@ -110,7 +116,19 @@ class SyncTest(unittest.TestCase):
         (self.root / "skills/new/SKILL.md").write_text("# new\n", encoding="utf-8")
         code, _, err = self.run_sync()
         self.assertEqual(code, 1)
-        self.assertIn("skills/new/SKILL.md: no 「版：Desk for LINE v…」 line", err)
+        self.assertIn("skills/new/SKILL.md: no 「バージョン：Desk for LINE v…」 line", err)
+
+    def test_reports_memory_without_version_line(self):
+        (self.root / "template/memory.md").write_text("- Desk for LINE の版：v0.1.0\n", encoding="utf-8")
+        code, _, err = self.run_sync()
+        self.assertEqual(code, 1)
+        self.assertIn("template/memory.md: no 「Desk for LINE のバージョン：v…（VERSION の値は …」 line", err)
+
+    def test_reports_profile_without_label(self):
+        (self.root / "template/profile.md").write_text("# profile\n", encoding="utf-8")
+        code, _, err = self.run_sync()
+        self.assertEqual(code, 1)
+        self.assertIn("template/profile.md: no 「バージョン：Desk for LINE v…」 line", err)
 
     def test_reports_missing_changelog_section(self):
         (self.root / "CHANGELOG.md").write_text("## v0.1.0\n", encoding="utf-8")

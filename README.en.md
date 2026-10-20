@@ -2,7 +2,7 @@
 
 English | [日本語](README.md)
 
-Scripts, skills and the routine used by the Grok Bot template "Desk for LINE". The bot logs inquiries that reach a LINE Official Account, notifies the owner and drafts replies. Nothing is sent to customers without the owner's OK.
+Scripts, skills, the routine and the templates used by the Grok Bot template "Desk for LINE". The bot logs messages from customers and clients that reach a LINE Official Account, notifies the person using the bot and drafts replies. Nothing is sent to customers until that person has checked it.
 
 A Grok Bot template cannot carry scripts, so they live here and are distributed by version. The relay that delivers LINE webhooks to the bot is [line-webhook-relay](https://github.com/keesmark/line-webhook-relay).
 
@@ -12,10 +12,11 @@ A Grok Bot template cannot carry scripts, so they live here and are distributed 
 - `scripts/`: 14 scripts using only the Python 3 standard library. They never send anything.
 - `skills/`: the 8 skills, the same as in the template.
 - `routines/line-webhook.md`: the prompt of the inbound routine 「LINE受信の記録」.
+- `template/`: the template's memory (`memory.md`) and profile (`profile.md`). The desk-update skill compares the old and new ones and shows what changed in the memory.
 - `VERSION`: the version. The tag is `v` followed by VERSION (`0.1.0` → `v0.1.0`).
 - `CHANGELOG.md`: changes per version.
 - `MIGRATIONS.md`: manual steps when upgrading. The desk-update skill reads it.
-- `SHA256SUMS`: checksums of every file the bot receives (scripts, skills, routines, VERSION, CHANGELOG, MIGRATIONS). `SHA256SUMS.asc` is its signature.
+- `SHA256SUMS`: checksums of every file the bot receives (scripts, skills, routines, template, VERSION, CHANGELOG, MIGRATIONS). `SHA256SUMS.asc` is its signature.
 - `keys/release.asc`: the public signing key (fingerprint `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`). The desk-update skill carries the same key.
 - `tools/`, `tests/`: for people changing this repository. They are not installed in the bot.
 
@@ -28,21 +29,21 @@ flowchart LR
   K[Template's desk-update skill<br>public key and fingerprint] --> B[Bot]
   R[GitHub tag<br>v + VERSION] -->|tar.gz| B
   B -->|fingerprint matches, signature is good,<br>scripts match SHA256SUMS| W["/workspace/line-inbox/bin/"]
-  B -.->|anything differs| S[Stop and tell the owner]
+  B -.->|anything differs| S[Stop and tell the user]
 ```
 
 Normally the template's desk-getting-started skill has the bot do the following. When installing by hand, take the public key from the template's desk-update skill rather than from this repository, or check that its fingerprint is `F136 EFC6 1A9D 8292 7C32  43EE 0FAD 4225 1453 DA94`.
 
 ```sh
 tmp=$(mktemp -d) && cd "$tmp"
-curl -fsSL -o a.tgz https://github.com/keesmark/grok-bot-line-desk/archive/refs/tags/v0.1.0.tar.gz
+curl -fsSL -o a.tgz https://github.com/keesmark/grok-bot-line-desk/archive/refs/tags/v0.1.1.tar.gz
 tar -xzf a.tgz --strip-components=1
 g=$(mktemp -d)
 GNUPGHOME="$g" gpg --batch --quiet --import keys/release.asc
 GNUPGHOME="$g" gpg --batch --with-colons --list-keys | awk -F: '/^fpr/{print $10; exit}'   # stop unless F136EFC61A9D82927C3243EE0FAD42251453DA94
 GNUPGHOME="$g" gpg --batch --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS 2>/dev/null | grep -cE '^\[GNUPG:\] (GOODSIG |VALIDSIG F136EFC61A9D82927C3243EE0FAD42251453DA94 )'   # stop unless it prints 2
 sha256sum -c SHA256SUMS   # stop unless every line is OK
-diff <(find scripts skills routines -type f | LC_ALL=C sort) <(awk '{print $2}' SHA256SUMS | grep -E '^(scripts|skills|routines)/' | LC_ALL=C sort)   # stop unless equal (a file outside the signature was added)
+diff <(find scripts skills routines template -type f | LC_ALL=C sort) <(awk '{print $2}' SHA256SUMS | grep -E '^(scripts|skills|routines|template)/' | LC_ALL=C sort)   # stop unless equal (a file outside the signature was added)
 find . ! -type f ! -type d   # stop if anything is printed (a link was added)
 mkdir -p /workspace/line-inbox/bin
 sed -n 's#^[0-9a-f]\{64\}  scripts/\([a-z_]*\.py\)$#\1#p' SHA256SUMS | while read -r f; do cp "scripts/$f" /workspace/line-inbox/bin/; done
@@ -56,7 +57,7 @@ rm -rf "$g"
 ## Checking the version and updating
 - Installed version: `cat /workspace/line-inbox/bin/VERSION`. Unchanged contents: `cd /workspace/line-inbox/bin && { sed -n 's#  scripts/#  #p' SHA256SUMS; grep '  VERSION$' SHA256SUMS; } | sha256sum -c`.
 - Latest version: the latest [Release](https://github.com/keesmark/grok-bot-line-desk/releases/latest). `VERSION` on main is not used, since it may be bumped before the Release. Ask the bot 「更新はある？」 and the desk-update skill checks.
-- Updates are never installed automatically. The desk-update skill shows what changed and replaces the scripts only when the owner says 「更新」.
+- Updates are never installed automatically. The desk-update skill shows what changed and replaces the scripts only when the user says 「更新して」.
 
 ## Changing this repository
 
@@ -69,14 +70,18 @@ python3 -m venv .venv
 .venv/bin/coverage report
 ```
 
-After changing scripts or skills, run `python3 tools/sync.py`. It brings `SHA256SUMS`, the 「版：」 line of every skill and routine, and the tag in the download URLs of the READMEs and skills in line with `VERSION`. CI (`tools/sync.py --check`) fails when they are out of line. When `SHA256SUMS` changes it must be signed again; CI (`tools/release.py --verify`) fails when the signature does not match.
+After changing scripts or skills, run `python3 tools/sync.py`. It brings `SHA256SUMS`, the 「バージョン：」 line of every skill, routine and template, and the tag in the download URLs of the READMEs and skills in line with `VERSION`. CI (`tools/sync.py --check`) fails when they are out of line. When `SHA256SUMS` changes it must be signed again; CI (`tools/release.py --verify`) fails when the signature does not match.
 
 Releasing:
 
 1. Bump `VERSION` and add a `## v<version>` section to `CHANGELOG.md` and `MIGRATIONS.md` (write 「なし」 when there is nothing to do by hand).
 2. On the author's computer, run `python3 tools/release.py` (it syncs and signs in one go; gpg asks for the passphrase). Open a PR and merge it.
 3. Tag the merged commit `v<version>` and create a Release.
-4. Set 「Desk for LINE の版」 in the template memory to the new version and publish the template again (existing users update through the desk-update skill, so this is not required for them).
+4. Bring the template's memory and profile in line with `template/` and publish the template again (existing users update through the desk-update skill, so this is not required for them).
+
+## Credits
+
+Only ideas were borrowed from L Harness (MIT License) and the public feature pages of Lステップ, エルメ, プロラインフリー and Liny. No code was copied.
 
 ## License
 

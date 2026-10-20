@@ -3,11 +3,13 @@
 
 Usage: tools/sync.py [--check]
 
-Rewrites the 「版：Desk for LINE v…」 line of every skills/*/SKILL.md and
-routines/*.md, the release tag in the download URLs of README.md,
-README.en.md and skills/desk-getting-started/SKILL.md, and then SHA256SUMS over
-every file the bot receives (scripts/*.py, skills/*/SKILL.md, routines/*.md,
-VERSION, CHANGELOG.md, MIGRATIONS.md; paths from the repository root).
+Rewrites the 「バージョン：Desk for LINE v…」 line of every skills/*/SKILL.md,
+routines/*.md and template/profile.md, the 「Desk for LINE のバージョン：v…（VERSION
+の値は …」 line of template/memory.md, the release tag in the download URLs of
+README.md, README.en.md and skills/desk-getting-started/SKILL.md, and then
+SHA256SUMS over every file the bot receives (scripts/*.py, skills/*/SKILL.md,
+routines/*.md, template/*.md, VERSION, CHANGELOG.md, MIGRATIONS.md; paths from
+the repository root).
 CHANGELOG.md and MIGRATIONS.md must already have a "## v<VERSION>" section.
 tools/release.py runs this before it signs SHA256SUMS.
 
@@ -22,7 +24,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
-LABEL_RE = re.compile(r"(版：Desk for LINE )v\d+(?:\.\d+)*")
+LABEL_RE = re.compile(r"(バージョン：Desk for LINE )v\d+(?:\.\d+)*")
+MEMORY_RE = re.compile(r"(Desk for LINE のバージョン：)v\d+(?:\.\d+)*（VERSION の値は \d+(?:\.\d+)*")
+MEMORY = "template/memory.md"
+PROFILE = "template/profile.md"
 TAG_RE = re.compile(r"(/archive/refs/tags/)v\d+(?:\.\d+)*(?=\.tar\.gz)")
 TAGGED = ("README.md", "README.en.md", "skills/desk-getting-started/SKILL.md")
 SECTIONED = ("CHANGELOG.md", "MIGRATIONS.md")
@@ -39,7 +44,8 @@ def read(path):
 
 def shipped(root):
     return sorted(set(root.glob("scripts/*.py")) | set(root.glob("skills/*/SKILL.md"))
-                  | set(root.glob("routines/*.md")) | {root / name for name in SHIPPED})
+                  | set(root.glob("routines/*.md")) | set(root.glob("template/*.md"))
+                  | {root / name for name in SHIPPED})
 
 
 def sums(root, wanted):
@@ -57,12 +63,16 @@ def plan(root):
     tag = "v" + version
     wanted = {}
     problems = []
-    labelled = sorted(root.glob("skills/*/SKILL.md")) + sorted(root.glob("routines/*.md"))
+    labelled = sorted(root.glob("skills/*/SKILL.md")) + sorted(root.glob("routines/*.md")) + [root / PROFILE]
     for path in labelled:
         text = read(path)
         if not LABEL_RE.search(text):
-            problems.append("%s: no 「版：Desk for LINE v…」 line" % path.relative_to(root))
+            problems.append("%s: no 「バージョン：Desk for LINE v…」 line" % path.relative_to(root))
         wanted[path] = LABEL_RE.sub(r"\g<1>" + tag, text)
+    text = read(root / MEMORY)
+    if not MEMORY_RE.search(text):
+        problems.append("%s: no 「Desk for LINE のバージョン：v…（VERSION の値は …」 line" % MEMORY)
+    wanted[root / MEMORY] = MEMORY_RE.sub(lambda m: "%s%s（VERSION の値は %s" % (m.group(1), tag, version), text)
     for name in TAGGED:
         path = root / name
         text = wanted[path] if path in wanted else read(path)
