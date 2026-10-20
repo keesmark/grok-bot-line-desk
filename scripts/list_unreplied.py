@@ -37,9 +37,10 @@ Fields:
   name_clash     true when the sender has no nickname and their name reads the
                  same as another person's nickname or display name (ignoring
                  width, case, spaces, invisible marks, ID notes and a trailing
-                 様/さま/さん/殿) or holds "ID末尾": ask the owner for a nickname
-  like_nickname  true when that name reads like another person's nickname or
-                 holds "ID末尾": this is not the person with that nickname
+                 様/さま/さん/殿) or holds "ID末尾" (left out of the label): ask
+                 the owner for a nickname
+  like_nickname  true when that name reads like another person's nickname:
+                 this is not the person with that nickname
   name_stale     true when that name is missing or older than 7 days: fetch it
                  with get_profile and save it with profile_cache.py set
   text           first 60 chars of the latest text, newlines collapsed
@@ -198,14 +199,31 @@ def same_name(text):
                    and unicodedata.category(c) not in ("Cf", "Mn", "Me"))
 
 
-# A note like （ID末尾 1a2b） or a trailing 様/さま/さん/殿 does not make a name different.
-ID_NOTE_RE = re.compile(r"\(?id末尾[^)]*\)?")
+# A note like （ID末尾 1a2b） (also with look-alike letters or 未尾) or a trailing 様/さま/さん/殿 does not make a name different.
+ID_NOTE_RE = re.compile(r"\(?[^()]{0,3}[末未]尾[^)]*\)?")
 HONORIFIC_RE = re.compile(r"(?:様|さま|さん|殿)+$")
+SHOWN_NOTE_RE = re.compile(r"\(?[^()]{0,6}?[末未]\s*尾[^)]*\)?")
 
 
 def name_key(text):
     """same_name without ID notes and trailing honorifics (as in profile_cache.py)."""
     return HONORIFIC_RE.sub("", ID_NOTE_RE.sub("", same_name(text)))
+
+
+def has_id_note(text):
+    """Whether the name holds an ID note (末尾 or the look-alike 未尾; as in profile_cache.py)."""
+    key = same_name(text)
+    return "末尾" in key or "未尾" in key
+
+
+def without_id_note(name):
+    """For the label: a display name holding "ID末尾" loses that note, so only
+    the real ID tail shows."""
+    if not has_id_note(name):
+        return name
+    plain = "".join(c for c in unicodedata.normalize("NFKC", name) if c not in BLANKS
+                    and unicodedata.category(c) not in ("Cf", "Mn", "Me"))
+    return " ".join(SHOWN_NOTE_RE.sub(" ", plain).split()) or UNKNOWN_LABEL
 
 
 def nicknames(con):
@@ -279,9 +297,9 @@ def unreplied(con, include_groups):
         name = one_line(names.get(uid) or "").strip() if uid else ""
         nickname = one_line(nicks.get(uid) or "").strip() if uid else ""
         key = name_key(name) if name and not nickname else ""
-        noted = bool(name and not nickname and "id末尾" in same_name(name))
-        like = noted or bool(key and taken[0].get(key, set()) - {uid})
-        clash = like or bool(key and taken[1].get(key, set()) - {uid})
+        noted = bool(name and not nickname and has_id_note(name))
+        like = bool(key and taken[0].get(key, set()) - {uid})
+        clash = noted or like or bool(key and taken[1].get(key, set()) - {uid})
         chats.append({
             "n": len(chats) + 1,
             "chat_key": w["key"],
@@ -299,7 +317,8 @@ def unreplied(con, include_groups):
             "nickname": nickname,
             "user_id": uid,
             "short_id": short_id(uid),
-            "label": f"{name}（ID末尾 {short_id(uid)}）" if clash else label(nickname or name, uid),
+            "label": (f"{without_id_note(name)}（ID末尾 {short_id(uid)}）" if clash
+                      else label(nickname or name, uid)),
             "name_clash": clash,
             "like_nickname": like,
             "name_stale": is_stale(name, profiles.get(uid) if uid else None, now),

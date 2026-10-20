@@ -26,7 +26,7 @@ MEMBER = "U" + "0" * 28 + "c3d4"
 GROUP = "C" + "0" * 28 + "9f3e"
 NAME = "田中 花子"
 FALLBACK = "名前不明（ID末尾 a1b2）"
-PROFILE_KEYS = {"user_id", "display_name", "nickname", "profile_at", "stale", "short_id", "label", "name_clash", "like_nickname"}
+PROFILE_KEYS = {"user_id", "display_name", "nickname", "profile_at", "stale", "short_id", "label", "name_clash", "like_nickname", "first_message"}
 _mods, _ids = {}, itertools.count(1)
 
 
@@ -518,7 +518,10 @@ class DisplayNameTest(unittest.TestCase):
             self.assertIs(c["name_clash"], True, fake)
             self.assertTrue(c["label"].endswith("（ID末尾 e5f6）"), c["label"])
             self.assertIs(self.profile(OTHER)["name_clash"], True, fake)
-            self.assertIs(c["like_nickname"], True, fake)
+            self.assertIs(c["like_nickname"], fake != "鈴木（ID末尾 0000）", fake)
+            self.assertNotIn("a1b2", c["label"])
+            self.assertNotIn("0000", c["label"])
+            self.assertEqual(c["label"], self.profile(OTHER)["label"])
         self.set_name(OTHER, "田中（美容室）スタッフ")
         self.assertIs(self.chat()["name_clash"], False)
         self.set_name(OTHER, NAME + "さん")
@@ -540,6 +543,22 @@ class DisplayNameTest(unittest.TestCase):
         self.assertEqual(found[OTHER]["label"], "田中花子様（ID末尾 e5f6）")
         self.assertEqual(found[MEMBER]["label"], "佐藤")
 
+    def test_fake_id_note_is_left_out_of_the_label(self):
+        self.inbound(OTHER, "明日の件ですが")
+        cases = {"田中（美容室）（ID末尾 a111）": "田中(美容室)（ID末尾 e5f6）",
+                 "田中（ｉｄ末尾\ufe0f a111）様": "田中 様（ID末尾 e5f6）",
+                 "（ID末尾 a111）": "名前不明（ID末尾 e5f6）",
+                 "田中（\u0406D末尾 a111）": "田中（ID末尾 e5f6）",
+                 "田中（lD末尾 a111）": "田中（ID末尾 e5f6）",
+                 "田中（ID未尾 a111）": "田中（ID末尾 e5f6）",
+                 "田中（I D末 尾 a111）": "田中（ID末尾 e5f6）",
+                 "名前不明（\u0399D末尾 a111）": "名前不明（ID末尾 e5f6）"}
+        for fake, shown in cases.items():
+            self.set_name(OTHER, fake)
+            c = self.chat()
+            self.assertEqual((c["label"], c["name_clash"], c["like_nickname"]), (shown, True, False), fake)
+            self.assertEqual(self.label(OTHER), shown)
+
     def test_nickname_rules_for_length_honorific_and_id_note(self):
         self.set_name(OTHER, "鈴木")
         code, out, err = self.nick(USER, "--name", "-", stdin="あ" * 101)
@@ -557,6 +576,26 @@ class DisplayNameTest(unittest.TestCase):
         code, out, err = self.nick(USER, "--name", "-", stdin="田中（ID末尾 1234）")
         self.assertEqual(code, 1)
         self.assertIn("ID末尾; choose", err)
+
+    def first(self, user, message_id):
+        code, out, err = self.pc("get", user, "--json", "--message-id", message_id)
+        self.assertEqual(code, 0, err)
+        return json.loads(out)["first_message"]
+
+    def test_first_message_ignores_events_and_other_rows(self):
+        self.assertIsNone(self.profile(OTHER)["first_message"])
+        code, out, err = self.run_script("log_event", stdin=self.wrap(self.event("follow", OTHER)))
+        self.assertEqual(code, 0, err)
+        follow = int(re.search(r"inserted (\d+)", out).group(1))
+        self.assertIs(self.first(OTHER, follow), False)
+        group = self.inbound(OTHER, "グループです", source="group")
+        one = self.inbound(OTHER, "はじめまして")
+        two = self.inbound(OTHER, "もう一件")
+        self.assertIs(self.first(OTHER, group), True)
+        self.assertIs(self.first(OTHER, one), False)
+        self.assertIs(self.first(OTHER, two), False)
+        self.assertIs(self.first(USER, one), False)
+        self.assertIs(self.first(MEMBER, 999), False)
 
     def test_unreplied_name_is_cleaned(self):
         self.inbound(USER, "こんにちは")

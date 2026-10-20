@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cache LINE display names that the bot read with the line-oa MCP tool get_profile.
 
-Usage: profile_cache.py get <userId> [--json] [--max-age-days N]
+Usage: profile_cache.py get <userId> [--json [--message-id ID]] [--max-age-days N]
        profile_cache.py label <userId> [--max-age-days N]
        profile_cache.py set <userId> (--name-file PATH | --name -)
        profile_cache.py nickname <userId> (--name-file PATH | --name - | --clear)
@@ -9,15 +9,19 @@ Usage: profile_cache.py get <userId> [--json] [--max-age-days N]
 
 get    prints the cached display name on one line, or "unknown".
        --json prints {"user_id", "display_name", "nickname", "profile_at",
-       "stale", "short_id", "label", "name_clash", "like_nickname"}.
+       "stale", "short_id", "label", "name_clash", "like_nickname",
+       "first_message"}. first_message is null unless --message-id ID is
+       given; then true when messages.id ID is this user's first logged
+       inbound message (follow and other events, other accounts not counted).
 label  prints what the owner sees as the sender, on one line: the nickname,
        else the cached name (also when stale), else 名前不明（ID末尾 <short_id>）.
        A cached name of someone without a nickname that clashes gets
        （ID末尾 <short_id>） added (get --json: name_clash true): it reads the
        same as another person's nickname or display name (ignoring width,
        case, spaces, invisible marks, ID notes and a trailing 様/さま/さん/殿),
-       or it holds "ID末尾". like_nickname is true when it reads like another
-       person's nickname or holds "ID末尾": not the person with that nickname. short_id is the last 4 characters of the
+       or it holds "ID末尾" (that note is left out of the label). like_nickname
+       is true when it reads like another person's nickname: not the person
+       with that nickname. short_id is the last 4 characters of the
        user id; the full id is never shown.
 set    saves the name (from a file, or from stdin with --name -) as
        customers.display_name and sets profile_at to now. nickname, note and
@@ -195,34 +199,51 @@ def cached(conn, db, user_id):
 def name_clash(conn, user_id, name, nickname):
     """(name_clash, like_nickname) for a person without a nickname: their display
     name reads like another person's display name or nickname, or holds an ID
-    note; like_nickname when it reads like a nickname or holds an ID note."""
+    note; like_nickname when it reads like another person's nickname."""
     if nickname or not name:
         return False, False
-    if has_id_note(name):
-        return True, True
+    noted = has_id_note(name)
     want = name_key(name)
     if not want:
-        return False, False
+        return noted, False
     nick = "nickname" if has_nickname(conn) else "NULL"
     clash = like = False
     for other, other_nick in conn.execute(
             "SELECT display_name, %s FROM customers WHERE user_id<>?" % nick, (user_id,)):
         like = like or want == name_key(clean(other_nick))
         clash = clash or like or want == name_key(clean(other))
-    return clash, like
+    return clash or noted, like
 
 
 def shown(conn, user_id, name, nickname):
     """The label; a clashing display name gets the ID tail."""
     if name_clash(conn, user_id, name, nickname)[0]:
-        return "%s（ID末尾 %s）" % (name, short_id(user_id))
+        return "%s（ID末尾 %s）" % (without_id_note(name), short_id(user_id))
     return label(nickname or name, user_id)
 
 
-def get(conn, db, user_id, max_age_days, as_json):
+# Inbound rows that are customer messages from this user (as in list_unreplied.py).
+FIRST_MESSAGE_SQL = (
+    "SELECT id FROM messages WHERE direction='in' AND user_id=?"
+    " AND IFNULL(status, '') <> 'other_account'"
+    " AND (line_message_id IS NOT NULL OR IFNULL(message_type, '') IN"
+    " ('text', 'image', 'video', 'audio', 'file', 'location', 'sticker'))"
+    " ORDER BY id LIMIT 1")
+
+
+def first_message(conn, db, user_id, message_id):
+    """True when message_id is this user's first logged inbound message."""
+    need(conn, db, "messages", ("direction", "user_id", "status", "line_message_id",
+                                "message_type"))
+    row = conn.execute(FIRST_MESSAGE_SQL, (user_id,)).fetchone()
+    return bool(row) and row[0] == message_id
+
+
+def get(conn, db, user_id, max_age_days, as_json, message_id=None):
     name, nickname, profile_at = cached(conn, db, user_id)
     clash, like = name_clash(conn, user_id, name, nickname)
     if as_json:
+        first = None if message_id is None else first_message(conn, db, user_id, message_id)
         print(json.dumps({"user_id": user_id,
                           "display_name": name or None,
                           "nickname": nickname or None,
@@ -231,7 +252,8 @@ def get(conn, db, user_id, max_age_days, as_json):
                           "short_id": short_id(user_id),
                           "label": shown(conn, user_id, name, nickname),
                           "name_clash": clash,
-                          "like_nickname": like},
+                          "like_nickname": like,
+                          "first_message": first},
                          ensure_ascii=False))
     else:
         print(name or "unknown")
@@ -254,9 +276,10 @@ def same_name(text):
                    and unicodedata.category(c) not in ("Cf", "Mn", "Me"))
 
 
-# A note like （ID末尾 1a2b） or a trailing 様/さま/さん/殿 does not make a name different.
-ID_NOTE_RE = re.compile(r"\(?id末尾[^)]*\)?")
+# A note like （ID末尾 1a2b） (also with look-alike letters or 未尾) or a trailing 様/さま/さん/殿 does not make a name different.
+ID_NOTE_RE = re.compile(r"\(?[^()]{0,3}[末未]尾[^)]*\)?")
 HONORIFIC_RE = re.compile(r"(?:様|さま|さん|殿)+$")
+SHOWN_NOTE_RE = re.compile(r"\(?[^()]{0,6}?[末未]\s*尾[^)]*\)?")
 
 
 def name_key(text):
@@ -265,7 +288,21 @@ def name_key(text):
 
 
 def has_id_note(text):
-    return "id末尾" in same_name(text)
+    """Whether the name holds an ID note (末尾 or the look-alike 未尾)."""
+    key = same_name(text)
+    return "末尾" in key or "未尾" in key
+
+
+def without_id_note(name):
+    """For the label: a display name holding "ID末尾" loses that note, so only
+    the real ID tail shows."""
+    if not has_id_note(name):
+        return name
+    plain = "".join(c for c in unicodedata.normalize("NFKC", name) if c not in BLANKS
+                    and unicodedata.category(c) not in ("Cf", "Mn", "Me"))
+    return " ".join(SHOWN_NOTE_RE.sub(" ", plain).split()) or UNKNOWN_LABEL
+
+
 
 
 def set_nickname(conn, db, user_id, nickname):
@@ -329,7 +366,7 @@ def run(args, db):
     conn = open_db(db)
     try:
         if args.cmd == "get":
-            get(conn, db, args.user_id, args.max_age_days, args.json)
+            get(conn, db, args.user_id, args.max_age_days, args.json, args.message_id)
         elif args.cmd == "label":
             print_label(conn, db, args.user_id)
         elif args.cmd == "set":
@@ -353,7 +390,10 @@ def main(argv):
     p.add_argument("user_id", help="LINE user id")
     p.add_argument("--json", action="store_true",
                    help="print user_id, display_name, nickname, profile_at, stale,"
-                   " short_id, label, name_clash, like_nickname as JSON")
+                   " short_id, label, name_clash, like_nickname, first_message as JSON")
+    p.add_argument("--message-id", type=int, metavar="ID",
+                   help="with --json: first_message tells whether messages.id ID is"
+                   " this user's first logged message")
     p.add_argument("--max-age-days", type=max_age, default=MAX_AGE_DAYS,
                    metavar="N", help=age_help)
 
