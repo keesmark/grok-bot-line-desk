@@ -26,7 +26,7 @@ Usage:
       replied from the LINE app (single --to only; text and message id are
       then optional). --status auto_reply / auto_reply_unknown /
       auto_reply_failed mark a keyword auto-reply (sent / result unknown /
-      failed; logged by keyword.py sent, single --to only).
+      failed; logged by keyword_reply.py sent, single --to only).
   log_event.py --out --broadcast (--text-file <path> | --text -) [--link-known]
                [--line-message-id <id>] [--status sent|send_unknown|failed]
                [--error TEXT]

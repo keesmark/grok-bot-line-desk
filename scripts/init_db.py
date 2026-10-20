@@ -17,12 +17,13 @@ NULL on older rows means push / one.
 send_recipients links one sent message to the friends it was for.
 known_at_send=1 there means "a friend known in this DB at send time",
 not a confirmed delivery.
-keyword_rules holds the keyword auto-reply rules (keyword.py; shop data).
+keyword_rules holds the keyword auto-reply rules (keyword_reply.py; shop data).
 keyword_matches holds one row per inbound message a rule matched: a snapshot
 of the reply text, the decision (suggested / auto_pending / auto_sent /
 auto_unknown / auto_failed), the reason and the logged outbound row.
 messages.destination is the LINE account an inbound webhook was for (NULL on
 outbound and older rows); status 'other_account' = not this bot's account.
+customers.nickname is the owner's name for a friend (profile_cache.py nickname).
 desk_settings holds shop settings; account_destination (this bot's account)
 is learned from the first webhook; account.py shows, changes or forgets it.
 """
@@ -52,7 +53,7 @@ TABLES = {
  memo TEXT, updated_at TEXT)""",
     "customers": """CREATE TABLE IF NOT EXISTS customers(
  user_id TEXT PRIMARY KEY, display_name TEXT, note TEXT, evidence TEXT, updated_at TEXT,
- profile_at TEXT)""",
+ profile_at TEXT, nickname TEXT)""",
     "canned_replies": """CREATE TABLE IF NOT EXISTS canned_replies(
  name TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT)""",
     # Per-friend tags, one row per (user_id, tag); kept only here, not on LINE.
@@ -64,7 +65,7 @@ TABLES = {
  message_id INTEGER NOT NULL, user_id TEXT NOT NULL,
  known_at_send INTEGER NOT NULL DEFAULT 0,
  PRIMARY KEY(message_id, user_id))""",
-    # Keyword auto-reply rules set by the owner (keyword.py); shop data, purge_old.py keeps them.
+    # Keyword auto-reply rules set by the owner (keyword_reply.py); shop data, purge_old.py keeps them.
     "keyword_rules": """CREATE TABLE IF NOT EXISTS keyword_rules(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  keyword TEXT NOT NULL, keyword_norm TEXT NOT NULL,
